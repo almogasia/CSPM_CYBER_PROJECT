@@ -1,10 +1,14 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api'
+  baseURL: 'http://localhost:5000/api',
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 export const performCalculation = async (data: any) => {
+  console.log('Sending calculation request:', data);
   const response = await api.post('/calculations', data);
   return response.data;
 };

@@ -1,4 +1,4 @@
-import React, { Fragment, useState } from "react";
+import React, { Fragment, useState, useEffect } from "react";
 import { Dialog, Menu, Transition } from "@headlessui/react";
 import {
   HomeIcon,
@@ -16,16 +16,31 @@ import Logo from "./Logo";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: HomeIcon },
-  { name: "Assessment", href: "/assessment", icon: ClipboardDocumentListIcon },
   { name: "Logs", href: "/logs", icon: DocumentTextIcon },
-  { name: "Deploy", href: "/deploy", icon: CloudArrowUpIcon },
   { name: "Users", href: "/users", icon: UserGroupIcon },
+  {
+    name: "Coming Soon...",
+    icon: CloudArrowUpIcon,
+    children: [
+      {
+        name: "Assessment",
+        href: "/assessment",
+        icon: ClipboardDocumentListIcon,
+      },
+      { name: "Deploy", href: "/deploy", icon: CloudArrowUpIcon },
+    ],
+  },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    document.documentElement.classList.add("dark");
+  }, []);
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -69,35 +84,59 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                   <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
-                      <li>
-                        <ul role="list" className="-mx-2 space-y-1">
-                          {navigation.map((item) => (
-                            <li key={item.name}>
-                              <Link
-                                to={item.href}
-                                className={`
-                                  group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
-                                  ${
-                                    location.pathname === item.href
-                                      ? "bg-gray-50 dark:bg-gray-700 text-primary-600"
-                                      : "text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                                  }
-                                `}
+                      {navigation.map((item) => (
+                        <li key={item.name}>
+                          {item.children ? (
+                            <div>
+                              <button
+                                onClick={() =>
+                                  setShowComingSoon(!showComingSoon)
+                                }
+                                className="group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                               >
                                 <item.icon
-                                  className={`h-6 w-6 shrink-0 ${
-                                    location.pathname === item.href
-                                      ? "text-primary-600"
-                                      : "text-gray-400 group-hover:text-primary-600"
-                                  }`}
+                                  className="h-6 w-6 shrink-0"
                                   aria-hidden="true"
                                 />
                                 {item.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
+                              </button>
+                              {showComingSoon && (
+                                <ul className="pl-6">
+                                  {item.children.map((child) => (
+                                    <li key={child.name}>
+                                      <Link
+                                        to={child.href}
+                                        className="group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                      >
+                                        <child.icon
+                                          className="h-6 w-6 shrink-0"
+                                          aria-hidden="true"
+                                        />
+                                        {child.name}
+                                      </Link>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ) : (
+                            <Link
+                              to={item.href}
+                              className={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${
+                                location.pathname === item.href
+                                  ? "bg-gray-50 dark:bg-gray-700 text-primary-600"
+                                  : "text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                              }`}
+                            >
+                              <item.icon
+                                className="h-6 w-6 shrink-0"
+                                aria-hidden="true"
+                              />
+                              {item.name}
+                            </Link>
+                          )}
+                        </li>
+                      ))}
                     </ul>
                   </nav>
                 </div>
@@ -115,35 +154,57 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
-              <li>
-                <ul role="list" className="-mx-2 space-y-1">
-                  {navigation.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        to={item.href}
-                        className={`
-                          group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold
-                          ${
-                            location.pathname === item.href
-                              ? "bg-gray-50 dark:bg-gray-700 text-primary-600"
-                              : "text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                          }
-                        `}
+              {navigation.map((item) => (
+                <li key={item.name}>
+                  {item.children ? (
+                    <div>
+                      <button
+                        onClick={() => setShowComingSoon(!showComingSoon)}
+                        className="group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                       >
                         <item.icon
-                          className={`h-6 w-6 shrink-0 ${
-                            location.pathname === item.href
-                              ? "text-primary-600"
-                              : "text-gray-400 group-hover:text-primary-600"
-                          }`}
+                          className="h-6 w-6 shrink-0"
                           aria-hidden="true"
                         />
                         {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </li>
+                      </button>
+                      {showComingSoon && (
+                        <ul className="pl-6">
+                          {item.children.map((child) => (
+                            <li key={child.name}>
+                              <Link
+                                to={child.href}
+                                className="group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                              >
+                                <child.icon
+                                  className="h-6 w-6 shrink-0"
+                                  aria-hidden="true"
+                                />
+                                {child.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ) : (
+                    <Link
+                      to={item.href}
+                      className={`group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${
+                        location.pathname === item.href
+                          ? "bg-gray-50 dark:bg-gray-700 text-primary-600"
+                          : "text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      <item.icon
+                        className="h-6 w-6 shrink-0"
+                        aria-hidden="true"
+                      />
+                      {item.name}
+                    </Link>
+                  )}
+                </li>
+              ))}
             </ul>
           </nav>
         </div>

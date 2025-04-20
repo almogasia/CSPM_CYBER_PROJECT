@@ -7,6 +7,7 @@ import {
   ArrowPathIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
+import { performCalculation } from "../services/api";
 
 const cloudProviders = [
   {
@@ -58,13 +59,25 @@ export default function Assessment() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [scope, setScope] = useState("");
+  const [credentials, setCredentials] = useState("");
 
-  const handleStartAssessment = () => {
+  const handleStartAssessment = async () => {
     setIsRunning(true);
-    // Simulate assessment running
-    setTimeout(() => {
+    try {
+      console.log("Starting assessment...");
+      const result = await performCalculation({
+        provider: selectedProvider,
+        type: selectedType,
+        scope: scope || "default-scope",
+        credentials: credentials || "{}",
+      });
+      console.log("Assessment result:", result);
+    } catch (error) {
+      console.error("Assessment error:", error);
+    } finally {
       setIsRunning(false);
-    }, 3000);
+    }
   };
 
   return (
@@ -179,6 +192,8 @@ export default function Assessment() {
                   type="text"
                   name="scope"
                   id="scope"
+                  value={scope}
+                  onChange={(e) => setScope(e.target.value)}
                   className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:text-white sm:text-sm"
                   placeholder="e.g., us-east-1, eu-west-2"
                 />
@@ -197,6 +212,8 @@ export default function Assessment() {
                   id="credentials"
                   name="credentials"
                   rows={3}
+                  value={credentials}
+                  onChange={(e) => setCredentials(e.target.value)}
                   className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:text-white sm:text-sm"
                   placeholder="Enter your cloud credentials (JSON format)"
                 />
