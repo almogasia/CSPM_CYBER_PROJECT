@@ -1,5 +1,10 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -7,22 +12,136 @@ import Assessment from "./pages/Assessment";
 import Logs from "./pages/Logs";
 import Deploy from "./pages/Deploy";
 import Users from "./pages/Users";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import PrivateRoute from "./components/PrivateRoute";
+import AuthNav from "./components/AuthNav";
+import "./App.css";
 
 const queryClient = new QueryClient();
 
 function App() {
+  // --- State Management ---
+  // `isLoggedIn` tracks the authentication status of the user.
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // `username` stores the name of the logged-in user for display.
+  const [username, setUsername] = useState("");
+  // `isDarkMode` manages the theme of the application.
+  // It's initialized from localStorage to persist the user's preference.
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem("darkMode");
+    return savedMode ? JSON.parse(savedMode) : false;
+  });
+
+  // --- Side Effects ---
+  // This effect runs once on component mount to check for an existing session.
+  // If a token is found in localStorage, the user is considered logged in.
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const storedUsername = localStorage.getItem("username");
+    if (token) {
+      setIsLoggedIn(true);
+      setUsername(storedUsername || "");
+    }
+  }, []);
+
+  // This effect toggles the 'dark-mode' class on the body and saves the preference
+  // to localStorage whenever the `isDarkMode` state changes.
+  useEffect(() => {
+    document.body.className = isDarkMode ? "dark-mode" : "";
+    localStorage.setItem("darkMode", JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
+
+  // --- Event Handlers ---
+  // `handleLogin` is called from the Login and Register components to update the app's state.
+  const handleLogin = (name: string) => {
+    setIsLoggedIn(true);
+    setUsername(name);
+  };
+
+  // `handleLogout` clears session data from localStorage and resets the application's state.
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    setIsLoggedIn(false);
+    setUsername("");
+    // No need to navigate here, the PrivateRoute will handle redirection if not logged in
+  };
+
+  // Toggles the dark mode state.
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/assessment" element={<Assessment />} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="/deploy" element={<Deploy />} />
-            <Route path="/users" element={<Users />} />
-          </Routes>
-        </Layout>
+        {!isLoggedIn ? (
+          // Auth pages without layout
+          <>
+            <AuthNav />
+            <Routes>
+              <Route path="/login" element={<Login onLogin={handleLogin} />} />
+              <Route
+                path="/register"
+                element={<Register onLogin={handleLogin} />}
+              />
+              <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
+          </>
+        ) : (
+          // Protected pages with layout
+          <Layout
+            onLogout={handleLogout}
+            username={username}
+            isDarkMode={isDarkMode}
+            toggleDarkMode={toggleDarkMode}
+          >
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/assessment"
+                element={
+                  <PrivateRoute>
+                    <Assessment />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/logs"
+                element={
+                  <PrivateRoute>
+                    <Logs />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/deploy"
+                element={
+                  <PrivateRoute>
+                    <Deploy />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/users"
+                element={
+                  <PrivateRoute>
+                    <Users />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </Layout>
+        )}
       </Router>
     </QueryClientProvider>
   );

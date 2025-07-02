@@ -32,20 +32,32 @@ const navigation = [
   },
 ];
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+interface LayoutProps {
+  children: React.ReactNode;
+  onLogout: () => void;
+  username: string;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
+}
+
+export default function Layout({
+  children,
+  onLogout,
+  username,
+  isDarkMode,
+  toggleDarkMode,
+}: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
-
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle("dark");
-  };
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDarkMode]);
 
   return (
     <div className="min-h-screen">
@@ -224,11 +236,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1"></div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
+              <div className="flex items-center gap-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <span>Welcome, {username}</span>
+              </div>
+              <button
+                onClick={onLogout}
+                className="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+              >
+                Logout
+              </button>
               <button
                 onClick={toggleDarkMode}
                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                {darkMode ? (
+                {isDarkMode ? (
                   <SunIcon className="h-6 w-6 text-gray-300" />
                 ) : (
                   <MoonIcon className="h-6 w-6 text-gray-700" />
