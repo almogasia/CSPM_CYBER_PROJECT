@@ -66,11 +66,11 @@ pip install -r requirements.txt
 ### Create `.env` in `/server` with the following:
 
 ```env
+FLASK_APP=app.py
+FLASK_ENV=development
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
 JWT_SECRET=your_super_secret_key
-SECRET_KEY=your_secret_key
-MONGODB_URI=your_mongodb_connection_string
 ```
 
 ### Start the server:
@@ -173,19 +173,3 @@ Client runs at: [http://localhost:5173](http://localhost:5173)
 - [Flask](https://flask.palletsprojects.com/)
 - [Supabase](https://supabase.com/)
 - [Python](https://www.python.org/)
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
