@@ -33,6 +33,12 @@ function App() {
     return savedMode ? JSON.parse(savedMode) : false;
   });
 
+  // Always apply dark mode class to <body> based on state
+  useEffect(() => {
+    document.body.className = isDarkMode ? "dark-mode" : "";
+    localStorage.setItem("darkMode", JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
+
   // --- Side Effects ---
   // This effect runs once on component mount to check for an existing session.
   // If a token is found in localStorage, the user is considered logged in.
@@ -44,13 +50,6 @@ function App() {
       setUsername(storedUsername || "");
     }
   }, []);
-
-  // This effect toggles the 'dark-mode' class on the body and saves the preference
-  // to localStorage whenever the `isDarkMode` state changes.
-  useEffect(() => {
-    document.body.className = isDarkMode ? "dark-mode" : "";
-    localStorage.setItem("darkMode", JSON.stringify(isDarkMode));
-  }, [isDarkMode]);
 
   // --- Event Handlers ---
   // `handleLogin` is called from the Login and Register components to update the app's state.
@@ -70,7 +69,7 @@ function App() {
 
   // Toggles the dark mode state.
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+    setIsDarkMode((prev) => !prev);
   };
 
   return (
@@ -79,7 +78,7 @@ function App() {
         {!isLoggedIn ? (
           // Auth pages without layout
           <>
-            <AuthNav />
+            <AuthNav isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} />
             <Routes>
               <Route path="/login" element={<Login onLogin={handleLogin} />} />
               <Route

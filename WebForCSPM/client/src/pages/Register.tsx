@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import "../App.css";
 
@@ -114,8 +114,8 @@ export default function Register({ onLogin }: RegisterProps) {
           <span style={{ color: "var(--text-color)" }}>
             Already have an account?{" "}
           </span>
-          <a
-            href="/login"
+          <Link
+            to="/login"
             style={{
               color: "var(--primary-color)",
               textDecoration: "none",
@@ -123,7 +123,7 @@ export default function Register({ onLogin }: RegisterProps) {
             }}
           >
             Login here
-          </a>
+          </Link>
         </div>
       </form>
     </div>
