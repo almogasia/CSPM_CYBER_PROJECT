@@ -1,77 +1,129 @@
-# CSPM Web Interface
+# 🛡️ CSPM Web Interface – Full Stack Setup Guide
 
-A modern web interface for Cloud Security Posture Management (CSPM) that helps you monitor, assess, and secure your cloud environments.
+Welcome to **CSPM Web Interface**, a modern Cloud Security Posture Management application featuring:
 
-## Features
+- 🎨 **Frontend:** React + TypeScript + Tailwind CSS
+- 🔧 **Backend:** Python + Flask + Supabase
 
-- **Dashboard**: Overview of your cloud security status and recent activities
-- **Assessment**: Run security assessments on your cloud environments
-- **Log Collection**: Analyze security logs and events
-- **Deploy**: Deploy security tools and configurations to your cloud environments
+> ⚡️ _May the security assessments be thorough, the logs be clean, and the deployments be secure._
 
-## Tech Stack
+---
 
-- React 18
-- TypeScript
-- Tailwind CSS
-- Headless UI
-- React Query
-- React Router
+## 🗂️ Project Structure
 
-## Getting Started
+```
+WebForCSPM/
+├── client/       # React frontend
+├── server/       # Python Flask backend
+└── README.md     # You're here.
+```
 
-### Prerequisites
+---
 
-- Node.js 16 or later
-- npm 7 or later
+## ⚙️ Prerequisites
 
-### Installation
+Ensure the following tools are installed on your system:
 
-1. Clone the repository:
+- ✅ [Node.js](https://nodejs.org/) (v16+ recommended)
+- ✅ npm (comes with Node.js)
+- ✅ [Python](https://www.python.org/) (v3.8+ recommended)
+- ✅ pip (comes with Python)
+- ✅ Internet connection for API services
+
+---
+
+## 🔐 Required API Keys
+
+You must register and obtain **API keys** from the following services:
+
+| Service         | Purpose              | Get Key From                              |
+| --------------- | -------------------- | ----------------------------------------- |
+| Supabase        | Database & Auth      | [Supabase Console](https://supabase.com/) |
+| Additional APIs | Security assessments | Configure as needed                       |
+
+---
+
+## 📦 Project Installation
+
+### 1. Clone the Project
 
 ```bash
 git clone <repository-url>
-cd cspm-web
+cd WebForCSPM
 ```
 
-2. Install dependencies:
+---
+
+## 🛠️ Server Setup (Backend)
+
+### Navigate and install:
 
 ```bash
+cd server
+pip install -r requirements.txt
+```
+
+### Create `.env` in `/server` with the following:
+
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+JWT_SECRET=your_super_secret_key
+SECRET_KEY=your_secret_key
+MONGODB_URI=your_mongodb_connection_string
+```
+
+### Start the server:
+
+```bash
+python app.py
+```
+
+Server runs by default at: [http://localhost:5000](http://localhost:5000)
+
+---
+
+## 💻 Client Setup (Frontend)
+
+### Navigate and install:
+
+```bash
+cd ../client
 npm install
 ```
 
-3. Start the development server:
+### Start the client:
 
 ```bash
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+Client runs at: [http://localhost:5173](http://localhost:5173)
 
-### Building for Production
+---
 
-To create a production build:
+## 📚 API Overview
 
-```bash
-npm run build
-```
+### Auth Routes (`/api/`)
 
-The built files will be in the `dist` directory.
+- `POST /api/register` – Create a new user
+- `POST /api/login` – Log in and get JWT
+- `GET /api/me` – Get current user (JWT required)
 
-## Development
+### Assessment Routes (`/api/`)
 
-### Project Structure
+- `POST /api/assessment` – Run security assessment
+- `GET /api/logs` – Get security logs
+- `POST /api/deploy` – Deploy security configurations
 
-```
-src/
-  ├── components/     # Reusable UI components
-  ├── pages/         # Page components
-  ├── App.tsx        # Main application component
-  ├── main.tsx       # Application entry point
-  └── index.css      # Global styles
-```
+> 🔐 All protected routes require the header:  
+> `Authorization: Bearer <your_token>`
 
-### Available Scripts
+---
+
+## 🛠️ Available Scripts
+
+### Frontend (client directory)
 
 - `npm run dev` - Start development server
 - `npm run build` - Create production build
@@ -79,7 +131,52 @@ src/
 - `npm run lint` - Run ESLint
 - `npm run type-check` - Run TypeScript type checking
 
-## Contributing
+### Backend (server directory)
+
+- `python app.py` - Start Flask development server
+
+---
+
+## 📚 Tech Stack
+
+### Frontend
+
+- React 18
+- TypeScript
+- Tailwind CSS
+- Headless UI
+- React Query
+- React Router
+- Vite
+
+### Backend
+
+- Python 3.8+
+- Flask
+- Flask-CORS
+- Supabase
+- Scikit-learn
+- Pandas
+- NumPy
+- PyJWT
+- bcrypt
+- PyMongo
+
+---
+
+## 📚 Useful Docs
+
+- [React](https://reactjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Vite](https://vitejs.dev/)
+- [Flask](https://flask.palletsprojects.com/)
+- [Supabase](https://supabase.com/)
+- [Python](https://www.python.org/)
+
+---
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -87,6 +184,8 @@ src/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## License
+---
+
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
