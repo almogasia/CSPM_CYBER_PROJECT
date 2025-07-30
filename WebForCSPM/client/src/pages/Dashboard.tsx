@@ -354,7 +354,10 @@ export default function Dashboard() {
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">
               Recent Activity
             </h2>
-            <button className="text-sm text-primary-600 hover:text-primary-700">
+            <button 
+              onClick={() => navigate('/logs')}
+              className="text-sm text-primary-600 hover:text-primary-700"
+            >
               View All
             </button>
           </div>
@@ -403,7 +406,10 @@ export default function Dashboard() {
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">
               Recent Deployments
             </h2>
-            <button className="text-sm text-primary-600 hover:text-primary-700">
+            <button 
+              onClick={() => navigate('/deploy')}
+              className="text-sm text-primary-600 hover:text-primary-700"
+            >
               View All
             </button>
           </div>

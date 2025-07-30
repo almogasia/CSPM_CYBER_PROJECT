@@ -14,6 +14,7 @@ import {
   XMarkIcon,
   PlayIcon,
   StopIcon,
+  NoSymbolIcon,
 } from "@heroicons/react/24/outline";
 
 const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:5000/api";
@@ -66,6 +67,7 @@ type SortDirection = "asc" | "desc";
 type FilterType = {
   risk_level?: Log["risk_level"];
   user_identity_type?: string;
+  event_name?: string;
   timeRange?: "hour" | "day" | "week" | "month";
 };
 
@@ -87,6 +89,7 @@ export default function Logs() {
   const [totalPages, setTotalPages] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingInterval, setProcessingInterval] = useState<number | null>(null);
+  const [uniqueEventNames, setUniqueEventNames] = useState<string[]>([]);
 
   const fetchLogs = async () => {
     try {
@@ -104,6 +107,10 @@ export default function Logs() {
       if (response.data.success) {
         setLogs(response.data.logs);
         setTotalPages(response.data.total_pages);
+        
+        // Extract unique event names
+        const eventNames = [...new Set(response.data.logs.map((log: Log) => log.event_name))] as string[];
+        setUniqueEventNames(eventNames.sort());
       } else {
         setError("Failed to fetch logs");
       }
@@ -278,6 +285,8 @@ export default function Logs() {
       !activeFilters.risk_level || log.risk_level === activeFilters.risk_level;
     const matchesUserType =
       !activeFilters.user_identity_type || log.user_identity_type === activeFilters.user_identity_type;
+    const matchesEventName =
+      !activeFilters.event_name || log.event_name === activeFilters.event_name;
 
     const logTime = new Date(log.timestamp).getTime();
     const now = new Date().getTime();
@@ -300,7 +309,7 @@ export default function Logs() {
       !activeFilters.timeRange || now - logTime <= timeRange;
 
     return (
-      matchesSearch && matchesRiskLevel && matchesUserType && matchesTimeRange
+      matchesSearch && matchesRiskLevel && matchesUserType && matchesEventName && matchesTimeRange
     );
   });
 
@@ -549,7 +558,7 @@ export default function Logs() {
                       Filters
                     </h3>
                     <button
-                      onClick={handleClearFilters}
+                      onClick={() => setShowFilters(false)}
                       className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
                     >
                       <XMarkIcon className="h-5 w-5" />
@@ -602,6 +611,29 @@ export default function Logs() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Event Name
+                      </label>
+                      <select
+                        value={filters.event_name || ""}
+                        onChange={(e) =>
+                          handleFilterChange(
+                            "event_name",
+                            e.target.value || undefined
+                          )
+                        }
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:text-white sm:text-sm"
+                      >
+                        <option value="">All Event Names</option>
+                        {uniqueEventNames.map((eventName) => (
+                          <option key={eventName} value={eventName}>
+                            {eventName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         User Type
                       </label>
                       <select
@@ -639,6 +671,17 @@ export default function Logs() {
                 </div>
               )}
             </div>
+
+            {getActiveFilterCount() > 0 && (
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 rounded-lg flex items-center gap-2 bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors"
+                title="Clear all filters"
+              >
+                <NoSymbolIcon className="h-5 w-5" />
+                Clear Filters
+              </button>
+            )}
 
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
