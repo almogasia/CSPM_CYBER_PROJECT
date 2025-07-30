@@ -263,22 +263,26 @@ class LogManager:
             from datetime import datetime, timedelta
             yesterday = datetime.utcnow() - timedelta(days=1)
             
-            pipeline = [
-                {'$match': {'timestamp': {'$gte': yesterday}}},
-                {
-                    '$group': {
-                        '_id': {
-                            'hour': {'$hour': '$timestamp'},
-                            'day': {'$dayOfMonth': '$timestamp'}
-                        },
-                        'count': {'$sum': 1},
-                        'avg_risk': {'$avg': '$risk_score'}
-                    }
-                },
-                {'$sort': {'_id.day': 1, '_id.hour': 1}}
-            ]
+            # Get the most recent log entries from the last 24 hours
+            recent_logs = list(logs_collection.find(
+                {'timestamp': {'$gte': yesterday}}
+            ).sort('timestamp', -1).limit(10))
             
-            return list(logs_collection.aggregate(pipeline))
+            # Convert to the format expected by the frontend
+            activity = []
+            for log in recent_logs:
+                activity.append({
+                    'event_name': log.get('event_name', 'Unknown Event'),
+                    'timestamp': log.get('timestamp', datetime.utcnow()).isoformat(),
+                    'risk_level': log.get('risk_level', 'LOW'),
+                    'source_ip': log.get('source_ip', 'Unknown IP'),
+                    'user_identity_type': log.get('user_identity_type', 'Unknown User'),
+                    'risk_score': log.get('risk_score', 0),
+                    'anomaly_detected': log.get('anomaly_detected', False),
+                    'rule_based_flags': log.get('rule_based_flags', 0)
+                })
+            
+            return activity
         except Exception as e:
             print(f"Error getting recent activity: {e}")
             return []
