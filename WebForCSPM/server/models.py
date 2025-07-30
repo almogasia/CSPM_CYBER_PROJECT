@@ -376,21 +376,21 @@ class AnomalyDetector:
                 return anomalies
             else:
                 # Fallback to manual preprocessing
-                processed_data = self._preprocess_data(data)
-                
+        processed_data = self._preprocess_data(data)
+        
                 # Scale the features if scaler is available
                 if self.scaler:
-                    scaled_data = self.scaler.transform(processed_data)
+        scaled_data = self.scaler.transform(processed_data)
                 else:
                     scaled_data = processed_data
-                
-                # Make predictions (-1 for anomalies, 1 for normal)
-                predictions = self.model.predict(scaled_data)
-                
-                # Convert to boolean (True for anomalies, False for normal)
-                anomalies = predictions == -1
-                
-                return anomalies
+        
+        # Make predictions (-1 for anomalies, 1 for normal)
+        predictions = self.model.predict(scaled_data)
+        
+        # Convert to boolean (True for anomalies, False for normal)
+        anomalies = predictions == -1
+        
+        return anomalies
                 
         except Exception as e:
             print(f"Error in prediction: {e}")
@@ -432,7 +432,7 @@ class AnomalyDetector:
             raise FileNotFoundError(f"Model file not found: {filepath}")
         
         try:
-            model_data = joblib.load(filepath)
+        model_data = joblib.load(filepath)
             
             # Check if it's a Pipeline object (which is what we actually have)
             if hasattr(model_data, 'predict'):

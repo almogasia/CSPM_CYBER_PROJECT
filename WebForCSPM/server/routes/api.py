@@ -248,6 +248,8 @@ def process_random_log():
         
         # Save log to MongoDB
         from models import LogEntry, LogManager
+        from datetime import datetime
+        
         log_entry = LogEntry(
             event_id=data[0],
             event_name=data[4],
@@ -257,7 +259,8 @@ def process_random_log():
             risk_level=risk_level,
             model_loaded=model_loaded,
             anomaly_detected=bool(model_predictions[0] == -1) if model_loaded else False,
-            rule_based_flags=int(rule_flags[0])
+            rule_based_flags=int(rule_flags[0]),
+            timestamp=datetime.now()  # Use local system time
         )
         
         LogManager.add_log(log_entry)
@@ -562,6 +565,8 @@ def model_evaluate():
         }
         
         # Save log to MongoDB
+        from datetime import datetime
+        
         log_entry = LogEntry(
             event_id=data[0],
             event_name=data[4],
@@ -571,7 +576,8 @@ def model_evaluate():
             risk_level=risk_level,
             model_loaded=model_loaded,
             anomaly_detected=bool(model_predictions[0] == -1) if model_loaded else False,
-            rule_based_flags=int(rule_flags[0])
+            rule_based_flags=int(rule_flags[0]),
+            timestamp=datetime.now()  # Use local system time
         )
         
         LogManager.add_log(log_entry)
