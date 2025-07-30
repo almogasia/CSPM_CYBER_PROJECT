@@ -106,10 +106,11 @@ FLASK_APP=app.py
 FLASK_ENV=development
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
+MONGODB_URI=your_mongodb_uri
 JWT_SECRET=your_super_secret_key
 ```
 
-> 💡 **Important:** Replace `your_supabase_url`, `your_supabase_key`, and `your_super_secret_key` with your actual values from Supabase.
+> 💡 **Important:** Replace `your_supabase_url`, `your_supabase_key`, `your_mongodb_uri`, and `your_super_secret_key` with your actual values from Supabase and MongoDB.
 
 ### Step 5: Start the Server
 
