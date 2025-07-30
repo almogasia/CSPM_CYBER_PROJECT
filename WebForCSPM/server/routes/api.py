@@ -1,6 +1,71 @@
 from flask import Blueprint, request, jsonify
+from models import LogEntry, LogManager
 
 api_bp = Blueprint('api', __name__)
+
+@api_bp.route('/logs', methods=['GET'])
+def get_logs():
+    """Get logs with pagination"""
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 100))
+        skip = (page - 1) * limit
+        
+        logs = LogManager.get_logs(limit=limit, skip=skip)
+        total_count = LogManager.get_logs_count()
+        
+        # Convert ObjectId to string for JSON serialization
+        for log in logs:
+            log['_id'] = str(log['_id'])
+            if 'timestamp' in log:
+                log['timestamp'] = log['timestamp'].isoformat()
+        
+        return jsonify({
+            'success': True,
+            'logs': logs,
+            'total_count': total_count,
+            'page': page,
+            'limit': limit,
+            'total_pages': (total_count + limit - 1) // limit
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch logs: {str(e)}'}), 500
+
+@api_bp.route('/logs/stats', methods=['GET'])
+def get_logs_stats():
+    """Get aggregated statistics from logs"""
+    try:
+        stats = LogManager.get_stats()
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch stats: {str(e)}'}), 500
+
+@api_bp.route('/logs/trends', methods=['GET'])
+def get_logs_trends():
+    """Get trend data for the last 24 hours vs previous 24 hours"""
+    try:
+        trends = LogManager.get_trends()
+        return jsonify({
+            'success': True,
+            'trends': trends
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch trends: {str(e)}'}), 500
+
+@api_bp.route('/logs/recent-activity', methods=['GET'])
+def get_recent_activity():
+    """Get recent activity for the last 24 hours"""
+    try:
+        activity = LogManager.get_recent_activity()
+        return jsonify({
+            'success': True,
+            'activity': activity
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch recent activity: {str(e)}'}), 500
 
 @api_bp.route('/calculations', methods=['POST'])
 def perform_calculation():
@@ -191,6 +256,21 @@ def model_evaluate():
             'sensitive_action_bonus': int(df['is_sensitive_action'].iloc[0] * 10),
             'error_bonus': int(df['has_error'].iloc[0] * 10)
         }
+        
+        # Save log to MongoDB
+        log_entry = LogEntry(
+            event_id=data[0],
+            event_name=data[4],
+            user_identity_type=data[8],
+            source_ip=data[2],
+            risk_score=risk_score,
+            risk_level=risk_level,
+            model_loaded=model_loaded,
+            anomaly_detected=bool(model_predictions[0] == -1) if model_loaded else False,
+            rule_based_flags=int(rule_flags[0])
+        )
+        
+        LogManager.add_log(log_entry)
         
         # Convert result to serializable format
         result = convert_to_serializable(result)

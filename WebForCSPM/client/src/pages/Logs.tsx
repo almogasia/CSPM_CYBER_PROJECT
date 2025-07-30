@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -13,6 +14,8 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
+const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
 interface LogType {
   id: string;
   name: string;
@@ -24,205 +27,52 @@ interface LogType {
 }
 
 interface Log {
-  id: string;
-  severity: "critical" | "high" | "medium" | "low" | "info";
-  message: string;
+  _id: string;
+  event_id: string;
+  event_name: string;
+  user_identity_type: string;
+  source_ip: string;
+  risk_score: number;
+  risk_level: "HIGH" | "MEDIUM" | "LOW";
+  model_loaded: boolean;
+  anomaly_detected: boolean;
+  rule_based_flags: number;
   timestamp: string;
-  source: string;
 }
 
-const logTypes: LogType[] = [
-  {
-    id: "security",
-    name: "Security Events",
-    count: 156,
-    icon: ShieldCheckIcon,
-    color: "from-red-500 to-red-600",
-    trend: "up",
-    change: 12.3,
-  },
-  {
-    id: "compliance",
-    name: "Compliance Violations",
-    count: 23,
-    icon: DocumentTextIcon,
-    color: "from-yellow-500 to-yellow-600",
-    trend: "down",
-    change: -5.2,
-  },
-  {
-    id: "audit",
-    name: "Audit Logs",
-    count: 892,
-    icon: ChartBarIcon,
-    color: "from-blue-500 to-blue-600",
-    trend: "up",
-    change: 8.7,
-  },
-  {
-    id: "system",
-    name: "System Events",
-    count: 1472,
-    icon: ServerIcon,
-    color: "from-green-500 to-green-600",
-    trend: "up",
-    change: 3.1,
-  },
-];
+interface LogStats {
+  total_logs: number;
+  avg_risk_score: number;
+  high_risk_count: number;
+  medium_risk_count: number;
+  low_risk_count: number;
+  anomaly_count: number;
+  root_user_count: number;
+}
 
-const recentLogs: Log[] = [
-  {
-    id: "1",
-    severity: "critical",
-    message: "Unauthorized access attempt detected",
-    timestamp: "2024-03-24T10:30:00Z",
-    source: "Security",
-  },
-  {
-    id: "2",
-    severity: "high",
-    message: "Failed login attempts exceeded threshold",
-    timestamp: "2024-03-24T10:25:00Z",
-    source: "Authentication",
-  },
-  {
-    id: "3",
-    severity: "medium",
-    message: "Resource utilization above 80%",
-    timestamp: "2024-03-24T10:20:00Z",
-    source: "System",
-  },
-  {
-    id: "4",
-    severity: "low",
-    message: "Configuration change detected",
-    timestamp: "2024-03-24T10:15:00Z",
-    source: "Configuration",
-  },
-  {
-    id: "5",
-    severity: "info",
-    message: "System backup completed successfully",
-    timestamp: "2024-03-24T10:10:00Z",
-    source: "Backup",
-  },
-  {
-    id: "6",
-    severity: "critical",
-    message: "Database connection failure",
-    timestamp: "2024-03-24T10:05:00Z",
-    source: "Database",
-  },
-  {
-    id: "7",
-    severity: "high",
-    message: "API rate limit exceeded",
-    timestamp: "2024-03-24T10:00:00Z",
-    source: "API",
-  },
-  {
-    id: "8",
-    severity: "medium",
-    message: "Network latency spike detected",
-    timestamp: "2024-03-24T09:55:00Z",
-    source: "Network",
-  },
-  {
-    id: "9",
-    severity: "low",
-    message: "Cache miss rate increased",
-    timestamp: "2024-03-24T09:50:00Z",
-    source: "Cache",
-  },
-  {
-    id: "10",
-    severity: "info",
-    message: "New deployment completed",
-    timestamp: "2024-03-24T09:45:00Z",
-    source: "Deployment",
-  },
-  {
-    id: "11",
-    severity: "critical",
-    message: "SSL certificate expired",
-    timestamp: "2024-03-24T09:40:00Z",
-    source: "Security",
-  },
-  {
-    id: "12",
-    severity: "high",
-    message: "Memory usage critical",
-    timestamp: "2024-03-24T09:35:00Z",
-    source: "System",
-  },
-  {
-    id: "13",
-    severity: "medium",
-    message: "Service health check failed",
-    timestamp: "2024-03-24T09:30:00Z",
-    source: "Health",
-  },
-  {
-    id: "14",
-    severity: "low",
-    message: "User preferences updated",
-    timestamp: "2024-03-24T09:25:00Z",
-    source: "User",
-  },
-  {
-    id: "15",
-    severity: "info",
-    message: "System maintenance completed",
-    timestamp: "2024-03-24T09:20:00Z",
-    source: "Maintenance",
-  },
-  {
-    id: "16",
-    severity: "critical",
-    message: "Firewall rule violation",
-    timestamp: "2024-03-24T09:15:00Z",
-    source: "Security",
-  },
-  {
-    id: "17",
-    severity: "high",
-    message: "Database backup failed",
-    timestamp: "2024-03-24T09:10:00Z",
-    source: "Backup",
-  },
-  {
-    id: "18",
-    severity: "medium",
-    message: "Load balancer configuration changed",
-    timestamp: "2024-03-24T09:05:00Z",
-    source: "Network",
-  },
-  {
-    id: "19",
-    severity: "low",
-    message: "New user registration",
-    timestamp: "2024-03-24T09:00:00Z",
-    source: "User",
-  },
-  {
-    id: "20",
-    severity: "info",
-    message: "System update available",
-    timestamp: "2024-03-24T08:55:00Z",
-    source: "System",
-  },
-];
+interface LogTrends {
+  total_change: number;
+  high_risk_change: number;
+  medium_risk_change: number;
+  anomalies_change: number;
+  root_users_change: number;
+}
 
-type SortField = "timestamp" | "severity";
+type SortField = "timestamp" | "risk_level" | "risk_score";
 type SortDirection = "asc" | "desc";
 
 type FilterType = {
-  severity?: Log["severity"];
-  source?: string;
+  risk_level?: Log["risk_level"];
+  user_identity_type?: string;
   timeRange?: "hour" | "day" | "week" | "month";
 };
 
 export default function Logs() {
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [stats, setStats] = useState<LogStats | null>(null);
+  const [trends, setTrends] = useState<LogTrends | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -231,12 +81,79 @@ export default function Logs() {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterType>({});
   const [activeFilters, setActiveFilters] = useState<FilterType>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const handleRefresh = () => {
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/logs`, {
+        params: {
+          page: currentPage,
+          limit: 50
+        },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (response.data.success) {
+        setLogs(response.data.logs);
+        setTotalPages(response.data.total_pages);
+      } else {
+        setError("Failed to fetch logs");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Failed to fetch logs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/logs/stats`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (response.data.success) {
+        setStats(response.data.stats);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
+
+  const fetchTrends = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/logs/trends`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (response.data.success) {
+        setTrends(response.data.trends);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch trends:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+    fetchStats();
+    fetchTrends();
+  }, [currentPage]);
+
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 1000);
+    await fetchLogs();
+    await fetchStats();
+    await fetchTrends();
+    setIsRefreshing(false);
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,49 +186,42 @@ export default function Logs() {
     }));
   };
 
-  const getSeverityColor = (severity: Log["severity"]) => {
-    switch (severity) {
-      case "critical":
+  const getRiskLevelColor = (riskLevel: Log["risk_level"]) => {
+    switch (riskLevel) {
+      case "HIGH":
         return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
-      case "high":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400";
-      case "medium":
+      case "MEDIUM":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400";
-      case "low":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
-      case "info":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
+      case "LOW":
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
   };
 
-  const getSeverityOrder = (severity: Log["severity"]) => {
-    switch (severity) {
-      case "critical":
-        return 4;
-      case "high":
+  const getRiskLevelOrder = (riskLevel: Log["risk_level"]) => {
+    switch (riskLevel) {
+      case "HIGH":
         return 3;
-      case "medium":
+      case "MEDIUM":
         return 2;
-      case "low":
+      case "LOW":
         return 1;
-      case "info":
-        return 0;
       default:
-        return -1;
+        return 0;
     }
   };
 
-  const filteredLogs = recentLogs.filter((log) => {
+  const filteredLogs = logs.filter((log) => {
     const matchesSearch =
-      log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.source.toLowerCase().includes(searchQuery.toLowerCase());
+      log.event_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.source_ip.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.user_identity_type.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesSeverity =
-      !activeFilters.severity || log.severity === activeFilters.severity;
-    const matchesSource =
-      !activeFilters.source || log.source === activeFilters.source;
+    const matchesRiskLevel =
+      !activeFilters.risk_level || log.risk_level === activeFilters.risk_level;
+    const matchesUserType =
+      !activeFilters.user_identity_type || log.user_identity_type === activeFilters.user_identity_type;
 
     const logTime = new Date(log.timestamp).getTime();
     const now = new Date().getTime();
@@ -334,7 +244,7 @@ export default function Logs() {
       !activeFilters.timeRange || now - logTime <= timeRange;
 
     return (
-      matchesSearch && matchesSeverity && matchesSource && matchesTimeRange
+      matchesSearch && matchesRiskLevel && matchesUserType && matchesTimeRange
     );
   });
 
@@ -347,11 +257,13 @@ export default function Logs() {
           multiplier *
           (new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
         );
-      case "severity":
+      case "risk_level":
         return (
           multiplier *
-          (getSeverityOrder(a.severity) - getSeverityOrder(b.severity))
+          (getRiskLevelOrder(a.risk_level) - getRiskLevelOrder(b.risk_level))
         );
+      case "risk_score":
+        return multiplier * (a.risk_score - b.risk_score);
       default:
         return 0;
     }
@@ -387,6 +299,54 @@ export default function Logs() {
     </button>
   );
 
+  // Create log types from stats
+  const logTypes: LogType[] = [
+    {
+      id: "security",
+      name: "Security Events",
+      count: stats?.high_risk_count || 0,
+      icon: ShieldCheckIcon,
+      color: "from-red-500 to-red-600",
+      trend: trends?.high_risk_change && trends.high_risk_change > 0 ? "up" : "down",
+      change: trends?.high_risk_change ? Math.abs(trends.high_risk_change) : 0,
+    },
+    {
+      id: "compliance",
+      name: "Compliance Violations",
+      count: stats?.medium_risk_count || 0,
+      icon: DocumentTextIcon,
+      color: "from-yellow-500 to-yellow-600",
+      trend: trends?.medium_risk_change && trends.medium_risk_change > 0 ? "up" : "down",
+      change: trends?.medium_risk_change ? Math.abs(trends.medium_risk_change) : 0,
+    },
+    {
+      id: "audit",
+      name: "Audit Logs",
+      count: stats?.total_logs || 0,
+      icon: ChartBarIcon,
+      color: "from-blue-500 to-blue-600",
+      trend: trends?.total_change && trends.total_change > 0 ? "up" : "down",
+      change: trends?.total_change ? Math.abs(trends.total_change) : 0,
+    },
+    {
+      id: "system",
+      name: "System Events",
+      count: stats?.anomaly_count || 0,
+      icon: ServerIcon,
+      color: "from-green-500 to-green-600",
+      trend: trends?.anomalies_change && trends.anomalies_change > 0 ? "up" : "down",
+      change: trends?.anomalies_change ? Math.abs(trends.anomalies_change) : 0,
+    },
+  ];
+
+  if (loading && logs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -404,6 +364,22 @@ export default function Logs() {
           Refresh
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                Error
+              </h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {error}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
         <div className="flex items-center justify-between mb-6">
@@ -446,6 +422,29 @@ export default function Logs() {
             </div>
           ))}
         </div>
+
+        {stats && (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Average Risk Score</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.avg_risk_score.toFixed(1)}
+              </p>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Root User Activities</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.root_user_count}
+              </p>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Anomalies Detected</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.anomaly_count}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
@@ -489,24 +488,22 @@ export default function Logs() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Severity
+                        Risk Level
                       </label>
                       <select
-                        value={filters.severity || ""}
+                        value={filters.risk_level || ""}
                         onChange={(e) =>
                           handleFilterChange(
-                            "severity",
+                            "risk_level",
                             e.target.value || undefined
                           )
                         }
                         className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:text-white sm:text-sm"
                       >
-                        <option value="">All Severities</option>
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                        <option value="info">Info</option>
+                        <option value="">All Risk Levels</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="LOW">Low</option>
                       </select>
                     </div>
 
@@ -534,24 +531,22 @@ export default function Logs() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Source
+                        User Type
                       </label>
                       <select
-                        value={filters.source || ""}
+                        value={filters.user_identity_type || ""}
                         onChange={(e) =>
                           handleFilterChange(
-                            "source",
+                            "user_identity_type",
                             e.target.value || undefined
                           )
                         }
                         className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:text-white sm:text-sm"
                       >
-                        <option value="">All Sources</option>
-                        <option value="Security">Security</option>
-                        <option value="Authentication">Authentication</option>
-                        <option value="System">System</option>
-                        <option value="Configuration">Configuration</option>
-                        <option value="Backup">Backup</option>
+                        <option value="">All User Types</option>
+                        <option value="Root">Root</option>
+                        <option value="IAMUser">IAM User</option>
+                        <option value="AssumedRole">Assumed Role</option>
                       </select>
                     </div>
                   </div>
@@ -619,20 +614,26 @@ export default function Logs() {
                     <SortButton field="timestamp" label="Time" />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    <SortButton field="severity" label="Severity" />
+                    <SortButton field="risk_level" label="Risk Level" />
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Message
+                    Event Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Source
+                    User Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Source IP
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <SortButton field="risk_score" label="Risk Score" />
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {sortedLogs.map((log) => (
                   <tr
-                    key={log.id}
+                    key={log._id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -640,18 +641,24 @@ export default function Logs() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getSeverityColor(
-                          log.severity
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getRiskLevelColor(
+                          log.risk_level
                         )}`}
                       >
-                        {log.severity}
+                        {log.risk_level}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                      {log.message}
+                      {log.event_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {log.source}
+                      {log.user_identity_type}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {log.source_ip}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {log.risk_score}
                     </td>
                   </tr>
                 ))}
@@ -659,6 +666,16 @@ export default function Logs() {
             </table>
           </div>
         </div>
+
+        {logs.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No logs found</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Start processing logs in the Model page to see them here.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

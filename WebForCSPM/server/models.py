@@ -9,9 +9,279 @@ import json
 from pymongo import MongoClient
 from config import Config
 
-# Initialize MongoDB connection
+# MongoDB connection
 client = MongoClient(Config.MONGODB_URI)
-db = client.get_database('DataForCSPM')  # Explicitly specify the database name
+db = client.cspm_db
+
+# Collections
+logs_collection = db.logs
+stats_collection = db.stats
+
+class LogEntry:
+    def __init__(self, event_id, event_name, user_identity_type, source_ip, 
+                 risk_score, risk_level, model_loaded, anomaly_detected, 
+                 rule_based_flags, timestamp=None):
+        self.event_id = event_id
+        self.event_name = event_name
+        self.user_identity_type = user_identity_type
+        self.source_ip = source_ip
+        self.risk_score = risk_score
+        self.risk_level = risk_level
+        self.model_loaded = model_loaded
+        self.anomaly_detected = anomaly_detected
+        self.rule_based_flags = rule_based_flags
+        self.timestamp = timestamp or datetime.utcnow()
+    
+    def to_dict(self):
+        return {
+            'event_id': self.event_id,
+            'event_name': self.event_name,
+            'user_identity_type': self.user_identity_type,
+            'source_ip': self.source_ip,
+            'risk_score': self.risk_score,
+            'risk_level': self.risk_level,
+            'model_loaded': self.model_loaded,
+            'anomaly_detected': self.anomaly_detected,
+            'rule_based_flags': self.rule_based_flags,
+            'timestamp': self.timestamp
+        }
+    
+    @staticmethod
+    def from_dict(data):
+        return LogEntry(
+            event_id=data.get('event_id'),
+            event_name=data.get('event_name'),
+            user_identity_type=data.get('user_identity_type'),
+            source_ip=data.get('source_ip'),
+            risk_score=data.get('risk_score'),
+            risk_level=data.get('risk_level'),
+            model_loaded=data.get('model_loaded'),
+            anomaly_detected=data.get('anomaly_detected'),
+            rule_based_flags=data.get('rule_based_flags'),
+            timestamp=data.get('timestamp')
+        )
+
+class LogManager:
+    @staticmethod
+    def add_log(log_entry):
+        """Add a new log entry and maintain only the latest 100 logs"""
+        try:
+            # Insert the new log
+            logs_collection.insert_one(log_entry.to_dict())
+            
+            # Count total logs
+            total_logs = logs_collection.count_documents({})
+            
+            # If we have more than 100 logs, remove the oldest ones
+            if total_logs > 100:
+                # Find the oldest logs to remove
+                oldest_logs = logs_collection.find().sort('timestamp', 1).limit(total_logs - 100)
+                oldest_ids = [log['_id'] for log in oldest_logs]
+                
+                # Remove the oldest logs
+                if oldest_ids:
+                    logs_collection.delete_many({'_id': {'$in': oldest_ids}})
+            
+            return True
+        except Exception as e:
+            print(f"Error adding log: {e}")
+            return False
+    
+    @staticmethod
+    def get_logs(limit=50, skip=0):
+        """Get logs with pagination"""
+        try:
+            logs = list(logs_collection.find().sort('timestamp', -1).skip(skip).limit(limit))
+            return logs
+        except Exception as e:
+            print(f"Error getting logs: {e}")
+            return []
+    
+    @staticmethod
+    def get_logs_count():
+        """Get total number of logs"""
+        try:
+            return logs_collection.count_documents({})
+        except Exception as e:
+            print(f"Error getting logs count: {e}")
+            return 0
+    
+    @staticmethod
+    def get_stats():
+        """Get aggregated statistics from logs"""
+        try:
+            pipeline = [
+                {
+                    '$group': {
+                        '_id': None,
+                        'total_logs': {'$sum': 1},
+                        'avg_risk_score': {'$avg': '$risk_score'},
+                        'high_risk_count': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'HIGH']}, 1, 0]}
+                        },
+                        'medium_risk_count': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'MEDIUM']}, 1, 0]}
+                        },
+                        'low_risk_count': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'LOW']}, 1, 0]}
+                        },
+                        'anomaly_count': {
+                            '$sum': {'$cond': ['$anomaly_detected', 1, 0]}
+                        },
+                        'root_user_count': {
+                            '$sum': {'$cond': [{'$eq': ['$user_identity_type', 'Root']}, 1, 0]}
+                        }
+                    }
+                }
+            ]
+            
+            result = list(logs_collection.aggregate(pipeline))
+            if result:
+                stats = result[0]
+                stats.pop('_id', None)
+                return stats
+            else:
+                return {
+                    'total_logs': 0,
+                    'avg_risk_score': 0,
+                    'high_risk_count': 0,
+                    'medium_risk_count': 0,
+                    'low_risk_count': 0,
+                    'anomaly_count': 0,
+                    'root_user_count': 0
+                }
+        except Exception as e:
+            print(f"Error getting stats: {e}")
+            return {
+                'total_logs': 0,
+                'avg_risk_score': 0,
+                'high_risk_count': 0,
+                'medium_risk_count': 0,
+                'low_risk_count': 0,
+                'anomaly_count': 0,
+                'root_user_count': 0
+            }
+    
+    @staticmethod
+    def get_trends():
+        """Calculate trend percentages for the last 24 hours vs previous 24 hours"""
+        try:
+            from datetime import datetime, timedelta
+            
+            now = datetime.utcnow()
+            yesterday = now - timedelta(days=1)
+            two_days_ago = now - timedelta(days=2)
+            
+            # Current 24 hours
+            current_pipeline = [
+                {'$match': {'timestamp': {'$gte': yesterday}}},
+                {
+                    '$group': {
+                        '_id': None,
+                        'current_total': {'$sum': 1},
+                        'current_high_risk': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'HIGH']}, 1, 0]}
+                        },
+                        'current_medium_risk': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'MEDIUM']}, 1, 0]}
+                        },
+                        'current_anomalies': {
+                            '$sum': {'$cond': ['$anomaly_detected', 1, 0]}
+                        },
+                        'current_root_users': {
+                            '$sum': {'$cond': [{'$eq': ['$user_identity_type', 'Root']}, 1, 0]}
+                        }
+                    }
+                }
+            ]
+            
+            # Previous 24 hours
+            previous_pipeline = [
+                {'$match': {'timestamp': {'$gte': two_days_ago, '$lt': yesterday}}},
+                {
+                    '$group': {
+                        '_id': None,
+                        'previous_total': {'$sum': 1},
+                        'previous_high_risk': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'HIGH']}, 1, 0]}
+                        },
+                        'previous_medium_risk': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'MEDIUM']}, 1, 0]}
+                        },
+                        'previous_anomalies': {
+                            '$sum': {'$cond': ['$anomaly_detected', 1, 0]}
+                        },
+                        'previous_root_users': {
+                            '$sum': {'$cond': [{'$eq': ['$user_identity_type', 'Root']}, 1, 0]}
+                        }
+                    }
+                }
+            ]
+            
+            current_result = list(logs_collection.aggregate(current_pipeline))
+            previous_result = list(logs_collection.aggregate(previous_pipeline))
+            
+            current = current_result[0] if current_result else {
+                'current_total': 0, 'current_high_risk': 0, 'current_medium_risk': 0,
+                'current_anomalies': 0, 'current_root_users': 0
+            }
+            previous = previous_result[0] if previous_result else {
+                'previous_total': 0, 'previous_high_risk': 0, 'previous_medium_risk': 0,
+                'previous_anomalies': 0, 'previous_root_users': 0
+            }
+            
+            # Calculate percentage changes
+            def calculate_change(current, previous):
+                if previous == 0:
+                    return 100.0 if current > 0 else 0.0
+                return ((current - previous) / previous) * 100
+            
+            trends = {
+                'total_change': calculate_change(current.get('current_total', 0), previous.get('previous_total', 0)),
+                'high_risk_change': calculate_change(current.get('current_high_risk', 0), previous.get('previous_high_risk', 0)),
+                'medium_risk_change': calculate_change(current.get('current_medium_risk', 0), previous.get('previous_medium_risk', 0)),
+                'anomalies_change': calculate_change(current.get('current_anomalies', 0), previous.get('previous_anomalies', 0)),
+                'root_users_change': calculate_change(current.get('current_root_users', 0), previous.get('previous_root_users', 0))
+            }
+            
+            return trends
+            
+        except Exception as e:
+            print(f"Error calculating trends: {e}")
+            return {
+                'total_change': 0.0,
+                'high_risk_change': 0.0,
+                'medium_risk_change': 0.0,
+                'anomalies_change': 0.0,
+                'root_users_change': 0.0
+            }
+    
+    @staticmethod
+    def get_recent_activity():
+        """Get recent activity for the last 24 hours"""
+        try:
+            from datetime import datetime, timedelta
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            
+            pipeline = [
+                {'$match': {'timestamp': {'$gte': yesterday}}},
+                {
+                    '$group': {
+                        '_id': {
+                            'hour': {'$hour': '$timestamp'},
+                            'day': {'$dayOfMonth': '$timestamp'}
+                        },
+                        'count': {'$sum': 1},
+                        'avg_risk': {'$avg': '$risk_score'}
+                    }
+                },
+                {'$sort': {'_id.day': 1, '_id.hour': 1}}
+            ]
+            
+            return list(logs_collection.aggregate(pipeline))
+        except Exception as e:
+            print(f"Error getting recent activity: {e}")
+            return []
 
 # User model for authentication
 class User:
