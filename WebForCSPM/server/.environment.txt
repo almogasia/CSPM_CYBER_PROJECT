@@ -1,0 +1,6 @@
+FLASK_APP=app.py
+FLASK_ENV=development
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+MONGODB_URI=your_mongodb_uri
+JWT_SECRET=your_super_secret_key
