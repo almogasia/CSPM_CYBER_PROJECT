@@ -102,37 +102,128 @@ const initialUsers: User[] = [
   },
   {
     id: "8",
-    name: "Fiona Green",
-    email: "fiona@example.com",
+    name: "Sarah Connor",
+    email: "sarah@example.com",
     role: "user",
     lastActive: "2024-03-24T07:20:00Z",
-    permissions: ["View Dashboard", "View Logs", "Manage Assessments"],
-    status: "inactive",
-  },
-  {
-    id: "9",
-    name: "George Miller",
-    email: "george@example.com",
-    role: "viewer",
-    lastActive: "2024-03-23T16:30:00Z",
-    permissions: ["View Dashboard"],
+    permissions: ["View Dashboard", "View Logs", "View Reports"],
     status: "active",
   },
   {
+    id: "9",
+    name: "Michael Scott",
+    email: "michael@example.com",
+    role: "viewer",
+    lastActive: "2024-03-22T16:30:00Z",
+    permissions: ["View Dashboard"],
+    status: "inactive",
+  },
+  {
     id: "10",
-    name: "Helen Davis",
-    email: "helen@example.com",
-    role: "admin",
+    name: "Lisa Simpson",
+    email: "lisa@example.com",
+    role: "user",
     lastActive: "2024-03-24T13:15:00Z",
+    permissions: ["View Dashboard", "View Logs", "Manage Assessments"],
+    status: "active",
+  },
+  {
+    id: "11",
+    name: "Tony Stark",
+    email: "tony@example.com",
+    role: "admin",
+    lastActive: "2024-03-24T14:00:00Z",
     permissions: [
       "Manage Users",
       "View Dashboard",
       "Manage Deployments",
+      "Manage Assessments",
       "View Reports",
+      "System Configuration",
     ],
     status: "active",
   },
+  {
+    id: "12",
+    name: "Natasha Romanoff",
+    email: "natasha@example.com",
+    role: "user",
+    lastActive: "2024-03-24T11:45:00Z",
+    permissions: ["View Dashboard", "View Logs", "Incident Response"],
+    status: "active",
+  },
 ];
+
+const userActivityLogs = [
+  {
+    id: "1",
+    userId: "1",
+    userName: "John Doe",
+    action: "Login",
+    timestamp: "2024-03-24T14:30:00Z",
+    ipAddress: "192.168.1.100",
+    userAgent: "Chrome/120.0.0.0",
+  },
+  {
+    id: "2",
+    userId: "4",
+    userName: "Alice Johnson",
+    action: "Created Assessment",
+    timestamp: "2024-03-24T14:25:00Z",
+    ipAddress: "192.168.1.105",
+    userAgent: "Firefox/119.0.0.0",
+  },
+  {
+    id: "3",
+    userId: "7",
+    userName: "Edward Stark",
+    action: "Updated User Permissions",
+    timestamp: "2024-03-24T14:20:00Z",
+    ipAddress: "192.168.1.110",
+    userAgent: "Safari/17.0.0.0",
+  },
+  {
+    id: "4",
+    userId: "2",
+    userName: "Jane Smith",
+    action: "Viewed Logs",
+    timestamp: "2024-03-24T14:15:00Z",
+    ipAddress: "192.168.1.115",
+    userAgent: "Chrome/120.0.0.0",
+  },
+  {
+    id: "5",
+    userId: "11",
+    userName: "Tony Stark",
+    action: "Deployed Security Agent",
+    timestamp: "2024-03-24T14:10:00Z",
+    ipAddress: "192.168.1.120",
+    userAgent: "Edge/120.0.0.0",
+  },
+];
+
+const rolePermissions = {
+  admin: [
+    "Manage Users",
+    "View Dashboard",
+    "Manage Deployments",
+    "Manage Assessments",
+    "View Reports",
+    "System Configuration",
+    "Incident Response",
+  ],
+  user: [
+    "View Dashboard",
+    "View Logs",
+    "View Reports",
+    "Manage Assessments",
+    "Incident Response",
+  ],
+  viewer: [
+    "View Dashboard",
+    "View Reports",
+  ],
+};
 
 const availablePermissions = [
   "Manage Users",
@@ -271,9 +362,20 @@ export default function Users() {
     }));
   };
 
+  const formatTimeAgo = (timestamp: string) => {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
   const filteredUsers = users.filter((user) => {
     // Search query filter
-    const matchesSearch =
+    const matchesSearch = searchQuery === "" ||
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.role.toLowerCase().includes(searchQuery.toLowerCase());
@@ -341,7 +443,7 @@ export default function Users() {
       if (Array.isArray(value)) {
         return value.length > 0;
       }
-      return value !== undefined && value !== "";
+      return value !== undefined && value !== null;
     }).length;
   };
 
@@ -799,6 +901,155 @@ export default function Users() {
           </div>
         </div>
       )}
+
+      {/* User Activity Logs */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Recent User Activity
+          </h2>
+          <button className="text-sm text-primary-600 hover:text-primary-700">
+            View All Logs
+          </button>
+        </div>
+        
+        <div className="space-y-4">
+          {userActivityLogs.map((activity) => (
+            <div key={activity.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="flex items-center space-x-4">
+                <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-lg flex items-center justify-center">
+                  <UserPlusIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-white">
+                    {activity.userName}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {activity.action} • {formatTimeAgo(activity.timestamp)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {activity.ipAddress}
+                </div>
+                <div className="text-xs text-gray-400 dark:text-gray-500">
+                  {activity.userAgent}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* User Analytics */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              User Distribution
+            </h3>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Admins</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.role === 'admin').length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Users</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.role === 'user').length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Viewers</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.role === 'viewer').length}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Activity Status
+            </h3>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Active</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.status === 'active').length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-gray-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Inactive</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.status === 'inactive').length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">Total Users</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.length}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Permission Overview
+            </h3>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Manage Users</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.permissions.includes('Manage Users')).length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">View Logs</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.permissions.includes('View Logs')).length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Manage Deployments</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.permissions.includes('Manage Deployments')).length}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">View Reports</span>
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {users.filter(u => u.permissions.includes('View Reports')).length}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

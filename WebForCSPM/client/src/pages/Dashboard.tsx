@@ -88,10 +88,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-    
-    // Refresh data every 30 seconds
-    const interval = setInterval(fetchDashboardData, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const getRiskLevelColor = (riskLevel: string) => {
@@ -279,90 +275,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Additional Metrics Section */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Risk Distribution
-            </h2>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">High Risk</span>
-              <span className="text-sm text-red-600 font-medium">{stats?.high_risk_count || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Medium Risk</span>
-              <span className="text-sm text-yellow-600 font-medium">{stats?.medium_risk_count || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Low Risk</span>
-              <span className="text-sm text-green-600 font-medium">{stats?.low_risk_count || 0}</span>
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">Average Risk Score</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {stats?.avg_risk_score ? stats.avg_risk_score.toFixed(1) : '0.0'}
-              </span>
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              System Health
-            </h2>
-            <span className="text-sm text-green-600 font-medium">Healthy</span>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">CPU Usage</span>
-              <span className="text-sm text-green-600 font-medium">45%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Memory Usage</span>
-              <span className="text-sm text-green-600 font-medium">62%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Disk Space</span>
-              <span className="text-sm text-yellow-600 font-medium">78%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Network</span>
-              <span className="text-sm text-green-600 font-medium">Normal</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-              Compliance Status
-            </h2>
-            <span className="text-sm text-green-600 font-medium">85%</span>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">SOC 2 Type II</span>
-              <span className="text-sm text-green-600 font-medium">✓ Compliant</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">ISO 27001</span>
-              <span className="text-sm text-green-600 font-medium">✓ Compliant</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">GDPR</span>
-              <span className="text-sm text-yellow-600 font-medium">⚠ Review</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">HIPAA</span>
-              <span className="text-sm text-red-600 font-medium">✗ Non-compliant</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Recent Activity Section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -541,6 +454,163 @@ export default function Dashboard() {
             </div>
             <span className="text-xs text-gray-600 dark:text-gray-400 text-center">System Health</span>
           </button>
+        </div>
+      </div>
+
+      {/* Security Alerts Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Security Alerts
+          </h2>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            Last updated: {new Date().toLocaleTimeString()}
+          </span>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-3" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                High-risk login attempt detected
+              </h3>
+              <p className="text-sm text-red-700 dark:text-red-300">
+                Multiple failed login attempts from IP 192.168.1.100
+              </p>
+            </div>
+            <span className="text-xs text-red-600">2 min ago</span>
+          </div>
+          <div className="flex items-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <ShieldCheckIcon className="h-5 w-5 text-yellow-500 mr-3" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                Unusual data access pattern
+              </h3>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                User accessed sensitive files outside business hours
+              </p>
+            </div>
+            <span className="text-xs text-yellow-600">15 min ago</span>
+          </div>
+          <div className="flex items-center p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <ServerIcon className="h-5 w-5 text-blue-500 mr-3" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                System maintenance scheduled
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Security patches will be applied at 2:00 AM UTC
+              </p>
+            </div>
+            <span className="text-xs text-blue-600">1 hour ago</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Compliance Overview */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+              Compliance Status
+            </h2>
+            <span className="text-sm text-green-600 font-medium">85% Compliant</span>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">SOC 2 Type II</span>
+              </div>
+              <span className="text-sm text-green-600 font-medium">✓ Compliant</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">ISO 27001</span>
+              </div>
+              <span className="text-sm text-green-600 font-medium">✓ Compliant</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">GDPR</span>
+              </div>
+              <span className="text-sm text-yellow-600 font-medium">⚠ Review</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">HIPAA</span>
+              </div>
+              <span className="text-sm text-red-600 font-medium">✗ Non-compliant</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+              Threat Intelligence
+            </h2>
+            <span className="text-sm text-blue-600 font-medium">Updated</span>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Active Threats</span>
+              <span className="text-sm text-red-600 font-medium">12</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Blocked Attacks</span>
+              <span className="text-sm text-green-600 font-medium">1,247</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Vulnerabilities</span>
+              <span className="text-sm text-yellow-600 font-medium">8</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Security Score</span>
+              <span className="text-sm text-green-600 font-medium">92/100</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Metrics */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+            Performance Metrics
+          </h2>
+          <div className="flex space-x-2">
+            <button className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-md">
+              1H
+            </button>
+            <button className="px-3 py-1 text-xs bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 rounded-md">
+              24H
+            </button>
+            <button className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-md">
+              7D
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">99.9%</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Uptime</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">45ms</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Avg Response</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">1.2K</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Requests/min</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">0.1%</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Error Rate</div>
+          </div>
         </div>
       </div>
     </div>
