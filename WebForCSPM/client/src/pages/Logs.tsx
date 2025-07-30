@@ -12,6 +12,8 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   XMarkIcon,
+  PlayIcon,
+  StopIcon,
 } from "@heroicons/react/24/outline";
 
 const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:5000/api";
@@ -83,6 +85,8 @@ export default function Logs() {
   const [activeFilters, setActiveFilters] = useState<FilterType>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingInterval, setProcessingInterval] = useState<number | null>(null);
 
   const fetchLogs = async () => {
     try {
@@ -148,12 +152,64 @@ export default function Logs() {
     fetchTrends();
   }, [currentPage]);
 
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (processingInterval) {
+        clearInterval(processingInterval);
+      }
+    };
+  }, [processingInterval]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchLogs();
     await fetchStats();
     await fetchTrends();
     setIsRefreshing(false);
+  };
+
+  const processRandomLog = async () => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/process-random-log`, {}, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (response.data.success) {
+        // Refresh logs and stats after processing
+        await fetchLogs();
+        await fetchStats();
+        await fetchTrends();
+      }
+    } catch (err: any) {
+      console.error("Error processing random log:", err);
+    }
+  };
+
+  const startProcessing = () => {
+    setIsProcessing(true);
+    const interval = setInterval(() => {
+      processRandomLog();
+    }, Math.random() * 3000 + 2000); // Random interval between 2-5 seconds
+    setProcessingInterval(interval);
+  };
+
+  const stopProcessing = () => {
+    setIsProcessing(false);
+    if (processingInterval) {
+      clearInterval(processingInterval);
+      setProcessingInterval(null);
+    }
+  };
+
+  const toggleProcessing = () => {
+    if (isProcessing) {
+      stopProcessing();
+    } else {
+      startProcessing();
+    }
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -353,16 +409,38 @@ export default function Logs() {
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
           Log Collection
         </h1>
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-        >
-          <ArrowPathIcon
-            className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleProcessing}
+            className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              isProcessing
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            {isProcessing ? (
+              <>
+                <StopIcon className="h-5 w-5" />
+                Stop Processing
+              </>
+            ) : (
+              <>
+                <PlayIcon className="h-5 w-5" />
+                Start Processing
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <ArrowPathIcon
+              className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
