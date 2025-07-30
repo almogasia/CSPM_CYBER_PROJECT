@@ -11,7 +11,7 @@ from config import Config
 
 # Initialize MongoDB connection
 client = MongoClient(Config.MONGODB_URI)
-db = client.get_database()
+db = client.get_database('DataForCSPM')  # Explicitly specify the database name
 
 # User model for authentication
 class User:
