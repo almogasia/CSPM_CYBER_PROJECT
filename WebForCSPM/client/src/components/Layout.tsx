@@ -18,6 +18,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: HomeIcon },
   { name: "Logs", href: "/logs", icon: DocumentTextIcon },
   { name: "Users", href: "/users", icon: UserGroupIcon },
+  { name: "Model", href: "/model", icon: ClipboardDocumentListIcon },
   {
     name: "Coming Soon...",
     icon: CloudArrowUpIcon,
@@ -140,10 +141,7 @@ export default function Layout({
                                   : "text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                               }`}
                             >
-                              <item.icon
-                                className="h-6 w-6 shrink-0"
-                                aria-hidden="true"
-                              />
+                              <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
                               {item.name}
                             </Link>
                           )}
@@ -158,9 +156,8 @@ export default function Layout({
         </Dialog>
       </Transition.Root>
 
-      {/* Static sidebar for desktop */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 pb-4">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-800 px-6 pb-4">
           <div className="flex h-16 shrink-0 items-center">
             <Logo />
           </div>
@@ -174,10 +171,7 @@ export default function Layout({
                         onClick={() => setShowComingSoon(!showComingSoon)}
                         className="group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                       >
-                        <item.icon
-                          className="h-6 w-6 shrink-0"
-                          aria-hidden="true"
-                        />
+                        <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
                         {item.name}
                       </button>
                       {showComingSoon && (
@@ -188,10 +182,7 @@ export default function Layout({
                                 to={child.href}
                                 className="group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                               >
-                                <child.icon
-                                  className="h-6 w-6 shrink-0"
-                                  aria-hidden="true"
-                                />
+                                <child.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
                                 {child.name}
                               </Link>
                             </li>
@@ -208,10 +199,7 @@ export default function Layout({
                           : "text-gray-700 dark:text-gray-300 hover:text-primary-600 hover:bg-gray-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      <item.icon
-                        className="h-6 w-6 shrink-0"
-                        aria-hidden="true"
-                      />
+                      <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
                       {item.name}
                     </Link>
                   )}
@@ -222,8 +210,9 @@ export default function Layout({
         </div>
       </div>
 
-      <div className="lg:pl-72">
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-0 lg:pl-0">
+      <div className="lg:pl-64">
+        {/* Top bar with username, logout, and dark mode toggle */}
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 lg:pl-0">
           <button
             type="button"
             className="-m-2.5 p-2.5 text-gray-700 dark:text-gray-300 lg:hidden"
@@ -258,7 +247,6 @@ export default function Layout({
             </div>
           </div>
         </div>
-
         <main className="py-10">
           <div className="px-4 sm:px-6 lg:px-8">{children}</div>
         </main>
