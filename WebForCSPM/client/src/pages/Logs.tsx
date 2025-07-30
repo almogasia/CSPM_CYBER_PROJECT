@@ -489,13 +489,6 @@ export default function Logs() {
                 <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                   {type.count}
                 </p>
-                <p
-                  className={`ml-2 flex items-baseline text-sm font-semibold ${
-                    type.trend === "up" ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {type.change}%
-                </p>
               </dd>
             </div>
           ))}
