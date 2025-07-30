@@ -191,6 +191,14 @@ class CSPMCalculator:
             else:
                 df = logs_data
             
+            # Load pre-trained model if available
+            model_path = 'aws_security_anomaly_detector_.pkl'
+            if os.path.exists(model_path):
+                try:
+                    self.anomaly_detector.load_model(model_path)
+                except Exception as e:
+                    print(f"Warning: Could not load model from {model_path}: {e}")
+            
             # Basic log analysis
             analysis_result = {
                 'total_logs': len(df),
@@ -202,14 +210,21 @@ class CSPMCalculator:
                 }
             }
             
-            # Detect anomalies if model is available
+            # Detect anomalies if model is available and fitted
             try:
-                anomalies = self.anomaly_detector.predict(df)
-                analysis_result['anomalies_detected'] = int(np.sum(anomalies))
-                analysis_result['anomaly_ratio'] = round(np.mean(anomalies), 4)
-            except:
+                if self.anomaly_detector.is_fitted:
+                    anomalies = self.anomaly_detector.predict(df)
+                    analysis_result['anomalies_detected'] = int(np.sum(anomalies))
+                    analysis_result['anomaly_ratio'] = round(np.mean(anomalies), 4)
+                else:
+                    # Model not loaded, use rule-based detection only
+                    analysis_result['anomalies_detected'] = 0
+                    analysis_result['anomaly_ratio'] = 0
+                    analysis_result['model_loaded'] = False
+            except Exception as e:
                 analysis_result['anomalies_detected'] = 0
                 analysis_result['anomaly_ratio'] = 0
+                analysis_result['model_error'] = str(e)
             
             return analysis_result
         
