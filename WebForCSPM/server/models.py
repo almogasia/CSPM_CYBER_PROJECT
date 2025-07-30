@@ -363,19 +363,38 @@ class AnomalyDetector:
         if not self.is_fitted:
             raise ValueError("Model must be fitted before making predictions")
         
-        # Preprocess the data
-        processed_data = self._preprocess_data(data)
-        
-        # Scale the features
-        scaled_data = self.scaler.transform(processed_data)
-        
-        # Make predictions (-1 for anomalies, 1 for normal)
-        predictions = self.model.predict(scaled_data)
-        
-        # Convert to boolean (True for anomalies, False for normal)
-        anomalies = predictions == -1
-        
-        return anomalies
+        try:
+            # If we have a Pipeline, use it directly
+            if hasattr(self.model, 'predict'):
+                # The Pipeline handles preprocessing internally
+                predictions = self.model.predict(data)
+                
+                # For Isolation Forest, -1 means anomaly, 1 means normal
+                # Convert to boolean (True for anomalies, False for normal)
+                anomalies = predictions == -1
+                
+                return anomalies
+            else:
+                # Fallback to manual preprocessing
+                processed_data = self._preprocess_data(data)
+                
+                # Scale the features if scaler is available
+                if self.scaler:
+                    scaled_data = self.scaler.transform(processed_data)
+                else:
+                    scaled_data = processed_data
+                
+                # Make predictions (-1 for anomalies, 1 for normal)
+                predictions = self.model.predict(scaled_data)
+                
+                # Convert to boolean (True for anomalies, False for normal)
+                anomalies = predictions == -1
+                
+                return anomalies
+                
+        except Exception as e:
+            print(f"Error in prediction: {e}")
+            raise
     
     def _preprocess_data(self, data):
         """Preprocess the input data for anomaly detection"""
@@ -412,10 +431,27 @@ class AnomalyDetector:
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Model file not found: {filepath}")
         
-        model_data = joblib.load(filepath)
-        self.model = model_data['model']
-        self.scaler = model_data['scaler']
-        self.is_fitted = model_data['is_fitted']
+        try:
+            model_data = joblib.load(filepath)
+            
+            # Check if it's a Pipeline object (which is what we actually have)
+            if hasattr(model_data, 'predict'):
+                # It's a Pipeline or model object, use it directly
+                self.model = model_data
+                self.scaler = None  # Scaler is part of the pipeline
+                self.is_fitted = True
+                print(f"Loaded model: {type(model_data)}")
+            elif isinstance(model_data, dict):
+                # It's a dictionary with separate components
+                self.model = model_data.get('model')
+                self.scaler = model_data.get('scaler')
+                self.is_fitted = model_data.get('is_fitted', False)
+            else:
+                raise ValueError(f"Unknown model format: {type(model_data)}")
+                
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            raise
 
 # CSPM Calculator
 class CSPMCalculator:

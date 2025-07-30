@@ -90,7 +90,7 @@ export default function Logs() {
       const response = await axios.get(`${API_BASE_URL}/logs`, {
         params: {
           page: currentPage,
-          limit: 50
+          limit: 100
         },
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
