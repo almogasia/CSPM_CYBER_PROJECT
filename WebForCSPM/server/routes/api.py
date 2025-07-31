@@ -90,13 +90,10 @@ def get_data():
 
 @api_bp.route('/process-random-log', methods=['POST'])
 def process_random_log():
-    """Process a random log from aws_logs.txt"""
+    """Process a random log from aws_logs.txt using the new multi-model system"""
     try:
         import random
-        from models import CSPMCalculator
-        import pandas as pd
-        import re
-        import numpy as np
+        from model import MultiModelCSPM
         
         # Read aws_logs.txt
         with open('aws_logs.txt', 'r', encoding='utf-8') as f:
@@ -108,175 +105,37 @@ def process_random_log():
         # Select a random line
         random_line = random.choice(lines).strip()
         
-        # Parse the log line
+        # Parse the log line - it should already be in pipe-separated format
         parts = random_line.split('|')
         if len(parts) < 18:
             return jsonify({'error': 'Invalid log format'}), 400
         
-        # Create the data array in the format expected by model_evaluate
-        data = parts[:18]  # Take first 18 parts
+        # Take first 18 parts and join them back into pipe-separated format
+        log_data = '|'.join(parts[:18])
         
-        # Use the same logic as model_evaluate
-        if not data or not isinstance(data, list) or len(data) != 18:
-            return jsonify({'error': 'Invalid data format'}), 400
+        # Initialize the multi-model CSPM system
+        cspm = MultiModelCSPM()
         
-        # Create DataFrame
-        columns = [
-            'eventID', 'eventTime', 'sourceIPAddress', 'userAgent', 'eventName',
-            'eventSource', 'awsRegion', 'eventVersion', 'userIdentitytype', 'eventType',
-            'userIdentityaccountId', 'userIdentityprincipalId', 'userIdentityarn',
-            'userIdentityaccessKeyId', 'userIdentityuserName', 'errorCode',
-            'errorMessage', 'requestParametersinstanceType'
-        ]
+        # Evaluate the log
+        result = cspm.evaluate_log(log_data)
         
-        df = pd.DataFrame([data], columns=columns)
+        if not result['success']:
+            return jsonify({'error': result['error']}), 400
         
-        # Apply the same preprocessing as in model_evaluate
-        df['errorCode'] = df['errorCode'].fillna('NoError')
+        # Extract features for additional context
+        features = log_data.split('|')
         
-        # Extract features from complex columns
-        df['isRootUser'] = df['userIdentitytype'].apply(lambda x: 1 if x == 'Root' else 0)
+        # Add the original log data to the result
+        result['original_log'] = random_line
+        result['parsed_features'] = {
+            'eventID': features[0],
+            'eventName': features[4],
+            'userIdentitytype': features[8],
+            'sourceIPAddress': features[2],
+            'errorCode': features[15] if len(features) > 15 else 'NoError'
+        }
         
-        # Parse IP address for analysis
-        def extract_ip_features(ip):
-            parts = str(ip).split('.')
-            if len(parts) >= 2:
-                return int(parts[0]), int(parts[1])
-            return 0, 0
-        
-        df['ip_first_octet'], df['ip_second_octet'] = zip(*df['sourceIPAddress'].apply(extract_ip_features))
-        
-        # Flag suspicious ARN patterns
-        df['has_suspicious_arn'] = df['userIdentityarn'].apply(
-            lambda x: 1 if re.search(r'role/.*admin|user/admin|root', str(x).lower()) else 0
-        )
-        
-        # Create feature for API calls that are typically used in attacks
-        sensitive_actions = ['Create', 'Delete', 'Modify', 'Put', 'Update']
-        df['is_sensitive_action'] = df['eventName'].apply(
-            lambda x: 1 if any(action in str(x) for action in sensitive_actions) else 0
-        )
-        
-        # Flag errors as potentially suspicious
-        df['has_error'] = df['errorMessage'].apply(lambda x: 0 if x == 'NoError' else 1)
-        
-        # Categorical columns to encode
-        categorical_columns = [
-            'eventSource', 'awsRegion', 'userIdentitytype', 
-            'eventType', 'eventName', 'userAgent'
-        ]
-        
-        # Feature columns for model
-        feature_columns = [
-            'isRootUser', 'ip_first_octet', 'ip_second_octet', 
-            'has_suspicious_arn', 'is_sensitive_action', 'has_error'
-        ]
-        
-        # All feature columns
-        all_feature_columns = categorical_columns + feature_columns
-        
-        # Load the model and make prediction
-        calculator = CSPMCalculator()
-        model_path = 'aws_security_anomaly_detector_.pkl'
-        model_loaded = False
-        if os.path.exists(model_path):
-            try:
-                calculator.anomaly_detector.load_model(model_path)
-                model_loaded = calculator.anomaly_detector.is_fitted
-            except Exception as e:
-                print(f"Error loading model: {e}")
-                model_loaded = False
-        
-        # Get model predictions
-        model_predictions = None
-        if model_loaded:
-            try:
-                model_predictions = calculator.anomaly_detector.predict(df[all_feature_columns])
-            except Exception as e:
-                print(f"Model prediction error: {e}")
-                model_loaded = False
-                model_predictions = np.array([1])
-        else:
-            model_predictions = np.array([1])
-        
-        # Calculate risk scores using the exact scoring from your model
-        # Base risk score from model (0-50)
-        base_scores = np.where(model_predictions == -1, 50, 0)
-        
-        # Rule-based detections (EXACT from your model)
-        rule_flags = np.zeros(len(df))
-        
-        # Rule 1: Root user performing sensitive actions
-        rule1 = (df['userIdentitytype'] == 'Root') & (df['is_sensitive_action'] == 1)
-        rule_flags = np.logical_or(rule_flags, rule1)
-        
-        # Rule 2: Failed access attempts
-        rule2 = df['errorCode'] != 'NoError'
-        rule_flags = np.logical_or(rule_flags, rule2)
-        
-        # Rule 3: Access from unusual IP ranges
-        rule3 = df['ip_first_octet'] > 255
-        rule_flags = np.logical_or(rule_flags, rule3)
-        
-        # Additional risk from rules (0-20)
-        rule_scores = rule_flags * 20
-        
-        # Combine scores
-        risk_scores = base_scores + rule_scores
-        
-        # Adjust based on specific features - EXACT from your model
-        # Add 10 points for root user activities
-        risk_scores += df['isRootUser'] * 10
-        
-        # Add 10 points for sensitive actions
-        risk_scores += df['is_sensitive_action'] * 10
-        
-        # Add 10 points for errors
-        risk_scores += df['has_error'] * 10
-        
-        # Get risk level for this specific log
-        risk_score = int(risk_scores[0])
-        risk_score = min(100, risk_score)  # Cap at 100
-        
-        # Determine risk level
-        if risk_score >= 80:
-            risk_level = "HIGH"
-        elif risk_score >= 50:
-            risk_level = "MEDIUM"
-        else:
-            risk_level = "LOW"
-        
-        # Save log to MongoDB
-        from models import LogEntry, LogManager
-        from datetime import datetime
-        
-        log_entry = LogEntry(
-            event_id=data[0],
-            event_name=data[4],
-            user_identity_type=data[8],
-            source_ip=data[2],
-            risk_score=risk_score,
-            risk_level=risk_level,
-            model_loaded=model_loaded,
-            anomaly_detected=bool(model_predictions[0] == -1) if model_loaded else False,
-            rule_based_flags=int(rule_flags[0]),
-            timestamp=datetime.now()  # Use local system time
-        )
-        
-        LogManager.add_log(log_entry)
-        
-        return jsonify({
-            'success': True,
-            'message': f'Processed log: {data[4]} - {risk_level} ({risk_score})',
-            'log_data': {
-                'event_name': data[4],
-                'user_identity_type': data[8],
-                'risk_score': risk_score,
-                'risk_level': risk_level,
-                'model_loaded': model_loaded,
-                'anomaly_detected': bool(model_predictions[0] == -1) if model_loaded else False
-            }
-        })
+        return jsonify(result)
         
     except FileNotFoundError:
         return jsonify({'error': 'aws_logs.txt not found'}), 404
@@ -285,305 +144,71 @@ def process_random_log():
 
 @api_bp.route('/model-evaluate', methods=['POST'])
 def model_evaluate():
-    """Evaluate a log using the trained anomaly detection model"""
-    from models import CSPMCalculator
-    import pandas as pd
-    import re
-    import numpy as np
+    """Evaluate a log using the new multi-model CSPM system"""
+    from model import MultiModelCSPM
+    from datetime import datetime
     
     data = request.json
-    if not data or not isinstance(data, list) or len(data) != 18:
-        return jsonify({'error': 'Input must be a list of 18 features'}), 400
+    
+    # Handle both old format (list) and new format (pipe-separated string)
+    if isinstance(data, list):
+        if len(data) != 18:
+            return jsonify({'error': 'Input must be a list of 18 features'}), 400
+        # Convert list to pipe-separated string
+        log_data = '|'.join(str(feature) for feature in data)
+    elif isinstance(data, str):
+        log_data = data
+    else:
+        return jsonify({'error': 'Input must be a list of 18 features or a pipe-separated string'}), 400
     
     try:
-        # Create DataFrame with original column names from training
-        columns = [
-            'eventID', 'eventTime', 'sourceIPAddress', 'userAgent', 'eventName',
-            'eventSource', 'awsRegion', 'eventVersion', 'userIdentitytype', 'eventType',
-            'userIdentityaccountId', 'userIdentityprincipalId', 'userIdentityarn',
-            'userIdentityaccessKeyId', 'userIdentityuserName', 'errorCode',
-            'errorMessage', 'requestParametersinstanceType'
-        ]
+        # Initialize the multi-model CSPM system
+        cspm = MultiModelCSPM()
         
-        # Convert input to DataFrame (handle mixed types)
-        df = pd.DataFrame([data], columns=columns)
+        # Evaluate the log
+        result = cspm.evaluate_log(log_data)
         
-        # Apply the same preprocessing as in training
-        # Handle missing values
-        df['errorCode'] = df['errorCode'].fillna('NoError')
+        if not result['success']:
+            return jsonify({'error': result['error']}), 400
         
-        # Extract features from complex columns
-        df['isRootUser'] = df['userIdentitytype'].apply(lambda x: 1 if x == 'Root' else 0)
-        
-        # Parse IP address for analysis
-        def extract_ip_features(ip):
-            parts = str(ip).split('.')
-            if len(parts) >= 2:
-                return int(parts[0]), int(parts[1])
-            return 0, 0
-        
-        df['ip_first_octet'], df['ip_second_octet'] = zip(*df['sourceIPAddress'].apply(extract_ip_features))
-        
-        # Flag suspicious ARN patterns
-        df['has_suspicious_arn'] = df['userIdentityarn'].apply(
-            lambda x: 1 if re.search(r'role/.*admin|user/admin|root', str(x).lower()) else 0
-        )
-        
-        # Create feature for API calls that are typically used in attacks
-        sensitive_actions = ['Create', 'Delete', 'Modify', 'Put', 'Update']
-        df['is_sensitive_action'] = df['eventName'].apply(
-            lambda x: 1 if any(action in str(x) for action in sensitive_actions) else 0
-        )
-        
-        # Flag errors as potentially suspicious
-        df['has_error'] = df['errorMessage'].apply(lambda x: 0 if x == 'NoError' else 1)
-        
-        # Categorical columns to encode
-        categorical_columns = [
-            'eventSource', 'awsRegion', 'userIdentitytype', 
-            'eventType', 'eventName', 'userAgent'
-        ]
-        
-        # Feature columns for model
-        feature_columns = [
-            'isRootUser', 'ip_first_octet', 'ip_second_octet', 
-            'has_suspicious_arn', 'is_sensitive_action', 'has_error'
-        ]
-        
-        # All feature columns - this is what the Pipeline expects
-        all_feature_columns = categorical_columns + feature_columns
-        
-        # Use the CSPMCalculator which loads the trained model
-        calculator = CSPMCalculator()
-        
-        # Directly load the model here to ensure it's loaded
-        model_path = 'aws_security_anomaly_detector_.pkl'
-        model_loaded = False
-        if os.path.exists(model_path):
-            try:
-                print(f"Attempting to load model from: {model_path}")
-                calculator.anomaly_detector.load_model(model_path)
-                model_loaded = calculator.anomaly_detector.is_fitted
-                print(f"Model loaded successfully: {model_loaded}")
-                print(f"Model object: {calculator.anomaly_detector.model}")
-            except Exception as e:
-                print(f"Error loading model: {e}")
-                model_loaded = False
-        else:
-            print(f"Model file not found: {model_path}")
-        
-        # Get model predictions first
-        model_predictions = None
-        if model_loaded:
-            try:
-                # Get model predictions - use the correct feature columns
-                print(f"Attempting model prediction with features: {all_feature_columns}")
-                print(f"DataFrame columns: {df.columns.tolist()}")
-                print(f"DataFrame shape: {df.shape}")
-                print(f"Sample data for prediction: {df[all_feature_columns].head()}")
-                
-                model_predictions = calculator.anomaly_detector.predict(df[all_feature_columns])
-                print(f"Model predictions: {model_predictions}")
-                print(f"Prediction type: {type(model_predictions)}")
-                print(f"Prediction shape: {model_predictions.shape if hasattr(model_predictions, 'shape') else 'no shape'}")
-                
-                # Check if predictions are anomalies (-1) or normal (1)
-                anomaly_count = np.sum(model_predictions == -1)
-                normal_count = np.sum(model_predictions == 1)
-                print(f"Anomalies detected: {anomaly_count}")
-                print(f"Normal predictions: {normal_count}")
-                
-            except Exception as e:
-                print(f"Model prediction error: {e}")
-                import traceback
-                traceback.print_exc()
-                model_loaded = False
-                model_predictions = np.array([1])  # Assume normal if prediction fails
-        else:
-            # Model not loaded, use rule-based detection only
-            print("Model not loaded, using rule-based detection only")
-            model_predictions = np.array([1])  # Assume normal (1) if model not available
-        
-        # Now use the same predictions for both analysis and risk calculation
-        result = calculator.analyze_logs(df)
-        
-        # Override the analysis result with our actual model predictions
-        if model_loaded and model_predictions is not None:
-            anomalies_detected = int(np.sum(model_predictions == -1))
-            anomaly_ratio = float(np.mean(model_predictions == -1))
-            result['anomalies_detected'] = anomalies_detected
-            result['anomaly_ratio'] = anomaly_ratio
-            result['model_loaded'] = True
-        else:
-            result['anomalies_detected'] = 0
-            result['anomaly_ratio'] = 0
-            result['model_loaded'] = False
-        
-        # Rule-based detections (from Kaggle code)
-        rule_flags = np.zeros(len(df))
-        
-        # Rule 1: Root user performing sensitive actions
-        rule1 = (df['userIdentitytype'] == 'Root') & (df['is_sensitive_action'] == 1)
-        rule_flags = np.logical_or(rule_flags, rule1)
-        
-        # Rule 2: Failed access attempts
-        rule2 = df['errorCode'] != 'NoError'
-        rule_flags = np.logical_or(rule_flags, rule2)
-        
-        # Rule 3: Access from unusual IP ranges
-        rule3 = df['ip_first_octet'] > 255
-        rule_flags = np.logical_or(rule_flags, rule3)
-        
-        # Calculate risk scores (from Kaggle code)
-        # Base risk score from model (0-50) - only if model is loaded
-        if model_loaded:
-            # Use model predictions for base score - this is the main source of truth
-            base_scores = np.where(model_predictions == -1, 50, 0)
-            print(f"Model predictions for base score: {model_predictions}")
-            print(f"Base scores calculated: {base_scores}")
-            
-            # TEMPORARY: Add base score for high-risk patterns that should be detected as anomalies
-            # This ensures logs that should be 100/100 get the right score
-            high_risk_events = ['CreatePolicyVersion', 'PutBucketPolicy', 'DeleteUser', 'CreateUser', 'DeleteRole']
-            is_high_risk_event = df['eventName'].isin(high_risk_events)
-            high_risk_user = (df['userIdentitytype'] == 'Root') & (df['is_sensitive_action'] == 1)
-            should_be_anomaly = is_high_risk_event | high_risk_user
-            
-            # If model didn't detect anomaly but should have, add base score
-            missed_anomalies = (model_predictions == 1) & should_be_anomaly
-            additional_base = np.where(missed_anomalies, 50, 0)
-            base_scores += additional_base
-            print(f"Additional base score for missed anomalies: {additional_base}")
-            print(f"Final base scores: {base_scores}")
-        else:
-            # Fallback: Use rule-based scoring for base score when model is not loaded
-            fallback_base_scores = np.zeros(len(df))
-            
-            # High risk patterns get higher base scores
-            # Root user with sensitive action: 40 points
-            root_sensitive = (df['userIdentitytype'] == 'Root') & (df['is_sensitive_action'] == 1)
-            fallback_base_scores = np.where(root_sensitive, 40, fallback_base_scores)
-            
-            # Root user with error: 35 points
-            root_error = (df['userIdentitytype'] == 'Root') & (df['has_error'] == 1)
-            fallback_base_scores = np.where(root_error, 35, fallback_base_scores)
-            
-            # Sensitive action with error: 30 points
-            sensitive_error = (df['is_sensitive_action'] == 1) & (df['has_error'] == 1)
-            fallback_base_scores = np.where(sensitive_error, 30, fallback_base_scores)
-            
-            # Root user only: 25 points
-            root_only = (df['userIdentitytype'] == 'Root') & (df['is_sensitive_action'] == 0) & (df['has_error'] == 0)
-            fallback_base_scores = np.where(root_only, 25, fallback_base_scores)
-            
-            # Sensitive action only: 20 points
-            sensitive_only = (df['is_sensitive_action'] == 1) & (df['userIdentitytype'] != 'Root') & (df['has_error'] == 0)
-            fallback_base_scores = np.where(sensitive_only, 20, fallback_base_scores)
-            
-            # Error only: 15 points
-            error_only = (df['has_error'] == 1) & (df['userIdentitytype'] != 'Root') & (df['is_sensitive_action'] == 0)
-            fallback_base_scores = np.where(error_only, 15, fallback_base_scores)
-            
-            base_scores = fallback_base_scores
-            print(f"Using fallback base scores: {base_scores}")
-        
-        # Additional risk from rules (0-20)
-        rule_scores = rule_flags * 20
-        
-        # Combine scores
-        risk_scores = base_scores + rule_scores
-        
-        # Adjust based on specific features - EXACT from your Kaggle model
-        # Add 10 points for root user activities
-        risk_scores += df['isRootUser'] * 10
-        
-        # Add 10 points for sensitive actions
-        risk_scores += df['is_sensitive_action'] * 10
-        
-        # Add 10 points for errors
-        risk_scores += df['has_error'] * 10
-        
-        # Get risk level for this specific log
-        risk_score = int(risk_scores[0])
-        
-        # Ensure score doesn't exceed 100
-        risk_score = min(100, risk_score)
-        
-        # Determine risk level
-        if risk_score >= 80:
-            risk_level = "HIGH"
-        elif risk_score >= 50:
-            risk_level = "MEDIUM"
-        else:
-            risk_level = "LOW"
-        
-        # Convert numpy/pandas types to standard Python types for JSON serialization
-        def convert_to_serializable(obj):
-            if hasattr(obj, 'item'):  # numpy types
-                return obj.item()
-            elif isinstance(obj, dict):
-                return {k: convert_to_serializable(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_to_serializable(v) for v in obj]
-            else:
-                return obj
-        
-        # Add additional context
-        result['input_features'] = {
-            'eventID': data[0],
-            'eventName': data[4],
-            'userIdentitytype': data[8],
-            'sourceIPAddress': data[2],
-            'isRootUser': int(df['isRootUser'].iloc[0]),
-            'is_sensitive_action': int(df['is_sensitive_action'].iloc[0]),
-            'has_error': int(df['has_error'].iloc[0])
-        }
-        
-        # Add risk assessment
-        result['risk_assessment'] = {
-            'risk_score': risk_score,
-            'risk_level': risk_level,
-            'model_loaded': model_loaded,
-            'model_anomaly_detected': bool(model_predictions[0] == -1) if model_loaded and model_predictions is not None else False,
-            'rule_based_flags': int(rule_flags[0]),
-            'base_score': int(base_scores[0]),
-            'rule_score': int(rule_scores[0]),
-            'root_user_bonus': int(df['isRootUser'].iloc[0] * 10),
-            'sensitive_action_bonus': int(df['is_sensitive_action'].iloc[0] * 10),
-            'error_bonus': int(df['has_error'].iloc[0] * 10),
-            'calculation_breakdown': {
-                'base_score': int(base_scores[0]),
-                'rule_score': int(rule_scores[0]),
-                'root_user_bonus': int(df['isRootUser'].iloc[0] * 10),
-                'sensitive_action_bonus': int(df['is_sensitive_action'].iloc[0] * 10),
-                'error_bonus': int(df['has_error'].iloc[0] * 10),
-                'total_calculated': int(risk_scores[0]),
-                'final_score': risk_score,
-                'model_prediction': int(model_predictions[0]) if model_predictions is not None else None,
-                'anomaly_detected': bool(model_predictions[0] == -1) if model_predictions is not None else False
-            }
-        }
+        # Extract features for logging
+        features = log_data.split('|')
         
         # Save log to MongoDB
-        from datetime import datetime
-        
         log_entry = LogEntry(
-            event_id=data[0],
-            event_name=data[4],
-            user_identity_type=data[8],
-            source_ip=data[2],
-            risk_score=risk_score,
-            risk_level=risk_level,
-            model_loaded=model_loaded,
-            anomaly_detected=bool(model_predictions[0] == -1) if model_loaded else False,
-            rule_based_flags=int(rule_flags[0]),
-            timestamp=datetime.now()  # Use local system time
+            event_id=features[0],
+            event_name=features[4],
+            user_identity_type=features[8],
+            source_ip=features[2],
+            risk_score=result['risk_score'],
+            risk_level=result['risk_level'],
+            model_loaded=result['models_loaded'],
+            anomaly_detected=result['model_predictions']['isolation_anomaly'] if result['models_loaded'] else False,
+            rule_based_flags=len(result['risk_reasons']),
+            timestamp=datetime.now()
         )
         
         LogManager.add_log(log_entry)
         
-        # Convert result to serializable format
-        result = convert_to_serializable(result)
+        # Add additional context for compatibility
+        result['anomalies_detected'] = 1 if result['risk_score'] >= 80 else 0
+        result['anomaly_ratio'] = 1.0 if result['risk_score'] >= 80 else 0.0
+        result['model_loaded'] = result['models_loaded']
+        
+        # Add risk assessment breakdown for compatibility
+        result['risk_assessment'] = {
+            'risk_score': result['risk_score'],
+            'risk_level': result['risk_level'],
+            'model_loaded': result['models_loaded'],
+            'model_anomaly_detected': result['model_predictions']['isolation_anomaly'] if result['models_loaded'] else False,
+            'rule_based_flags': len(result['risk_reasons']),
+            'calculation_breakdown': {
+                'risk_score': result['risk_score'],
+                'risk_level': result['risk_level'],
+                'model_predictions': result['model_predictions'],
+                'risk_reasons': result['risk_reasons']
+            }
+        }
         
         return jsonify(result)
         

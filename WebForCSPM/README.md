@@ -4,6 +4,7 @@ Welcome to **CSPM Web Interface**, a modern Cloud Security Posture Management ap
 
 - 🎨 **Frontend:** React + TypeScript + Tailwind CSS
 - 🔧 **Backend:** Python + Flask + Supabase
+- 🤖 **AI Models:** Multi-Model Anomaly Detection (Isolation Forest + Random Forest + Autoencoder)
 
 > ⚡️ _May the security assessments be thorough, the logs be clean, and the deployments be secure._
 
@@ -181,6 +182,16 @@ Open your web browser and go to `http://localhost:5173` to use the application!
 - `GET /api/logs` – Get security logs
 - `POST /api/deploy` – Deploy security configurations
 
+### Model Evaluation Routes (`/api/`)
+
+- `POST /api/model-evaluate` – Evaluate log using multi-model system
+- `POST /api/process-random-log` – Process random log from aws_logs.txt
+
+**Input Format:** Pipe-separated string with 18 features:
+```
+eventID|eventTime|sourceIPAddress|userAgent|eventName|eventSource|awsRegion|eventVersion|userIdentitytype|eventType|userIdentityaccountId|userIdentityprincipalId|userIdentityarn|userIdentityaccessKeyId|userIdentityuserName|errorCode|errorMessage|requestParametersinstanceType
+```
+
 > 🔐 All protected routes require the header:  
 > `Authorization: Bearer <your_token>`
 
@@ -226,6 +237,14 @@ Open your web browser and go to `http://localhost:5173` to use the application!
 - PyJWT
 - bcrypt
 - PyMongo
+- Joblib
+
+### AI/ML Models
+
+- **Isolation Forest:** Unsupervised anomaly detection
+- **Random Forest:** Supervised risk classification
+- **Autoencoder:** Deep learning anomaly detection
+- **Rule-based Engine:** Domain-specific security rules
 
 ---
 
@@ -238,5 +257,41 @@ Open your web browser and go to `http://localhost:5173` to use the application!
 - [Flask](https://flask.palletsprojects.com/)
 - [Supabase](https://supabase.com/)
 - [Python](https://www.python.org/)
+
+## 🤖 Multi-Model AI System
+
+The CSPM system now uses a sophisticated multi-model approach for anomaly detection:
+
+### Models Used
+
+1. **Isolation Forest** (40 points)
+   - Unsupervised anomaly detection
+   - Detects outliers in the feature space
+
+2. **Random Forest** (30 points)
+   - Supervised classification
+   - Identifies risky patterns based on training data
+
+3. **Autoencoder** (20 points)
+   - Deep learning reconstruction error
+   - Detects anomalies through reconstruction failure
+
+4. **Rule-based Engine** (10 points each rule)
+   - Domain-specific security rules
+   - Root user actions, error codes, suspicious IPs
+
+### Risk Scoring
+
+- **HIGH:** 80-100 points
+- **MEDIUM:** 50-79 points  
+- **LOW:** 0-49 points
+
+### Model Files Required
+
+Place these files in the `server/` directory:
+- `model_isolation_forest.pkl`
+- `model_random_forest.pkl`
+- `model_autoencoder.pkl`
+- `preprocessor.pkl`
 
 > ℹ️ **Note:** Both the server and client have `.env.example` files. Copy them to `.env` and fill in your actual values before running the app.
