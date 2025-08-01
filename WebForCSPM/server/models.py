@@ -125,6 +125,9 @@ class LogManager:
                         'low_risk_count': {
                             '$sum': {'$cond': [{'$eq': ['$risk_level', 'LOW']}, 1, 0]}
                         },
+                        'critical_risk_count': {
+                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'CRITICAL']}, 1, 0]}
+                        },
                         'anomaly_count': {
                             '$sum': {'$cond': ['$anomaly_detected', 1, 0]}
                         },

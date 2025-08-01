@@ -36,7 +36,7 @@ interface Log {
   user_identity_type: string;
   source_ip: string;
   risk_score: number;
-  risk_level: "HIGH" | "MEDIUM" | "LOW";
+  risk_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   model_loaded: boolean;
   anomaly_detected: boolean;
   rule_based_flags: number;
@@ -49,6 +49,7 @@ interface LogStats {
   high_risk_count: number;
   medium_risk_count: number;
   low_risk_count: number;
+  critical_risk_count: number;
   anomaly_count: number;
   root_user_count: number;
 }
@@ -251,6 +252,8 @@ export default function Logs() {
 
   const getRiskLevelColor = (riskLevel: Log["risk_level"]) => {
     switch (riskLevel) {
+      case "CRITICAL":
+        return "bg-red-900 text-red-100 dark:bg-red-800 dark:text-red-200";
       case "HIGH":
         return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
       case "MEDIUM":
@@ -264,6 +267,8 @@ export default function Logs() {
 
   const getRiskLevelOrder = (riskLevel: Log["risk_level"]) => {
     switch (riskLevel) {
+      case "CRITICAL":
+        return 4;
       case "HIGH":
         return 3;
       case "MEDIUM":
@@ -366,6 +371,15 @@ export default function Logs() {
 
   // Create log types from stats
   const logTypes: LogType[] = [
+    {
+      id: "critical",
+      name: "Critical Events",
+      count: stats?.critical_risk_count || 0,
+      icon: ExclamationTriangleIcon,
+      color: "from-red-800 to-red-900",
+      trend: "up",
+      change: 0,
+    },
     {
       id: "security",
       name: "Security Events",
@@ -581,6 +595,7 @@ export default function Logs() {
                         className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:text-white sm:text-sm"
                       >
                         <option value="">All Risk Levels</option>
+                        <option value="CRITICAL">Critical</option>
                         <option value="HIGH">High</option>
                         <option value="MEDIUM">Medium</option>
                         <option value="LOW">Low</option>

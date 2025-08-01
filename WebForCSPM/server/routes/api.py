@@ -94,6 +94,7 @@ def process_random_log():
     try:
         import random
         from model import MultiModelCSPM
+        from datetime import datetime
         
         # Read aws_logs.txt
         with open('aws_logs.txt', 'r', encoding='utf-8') as f:
@@ -125,6 +126,22 @@ def process_random_log():
         # Extract features for additional context
         features = log_data.split('|')
         
+        # Save log to MongoDB
+        log_entry = LogEntry(
+            event_id=features[0],
+            event_name=features[4],
+            user_identity_type=features[8],
+            source_ip=features[2],
+            risk_score=result['risk_score'],
+            risk_level=result['risk_level'],
+            model_loaded=True,  # Models are always loaded in new system
+            anomaly_detected=result['model_predictions']['isolation_anomaly'],
+            rule_based_flags=len(result['risk_reasons']),
+            timestamp=datetime.now()
+        )
+        
+        LogManager.add_log(log_entry)
+        
         # Add the original log data to the result
         result['original_log'] = random_line
         result['parsed_features'] = {
@@ -133,7 +150,7 @@ def process_random_log():
             'userIdentitytype': features[8],
             'sourceIPAddress': features[2],
             'errorCode': features[15] if len(features) > 15 else 'NoError'
-        }
+            }
         
         return jsonify(result)
         
@@ -182,25 +199,25 @@ def model_evaluate():
             source_ip=features[2],
             risk_score=result['risk_score'],
             risk_level=result['risk_level'],
-            model_loaded=result['models_loaded'],
-            anomaly_detected=result['model_predictions']['isolation_anomaly'] if result['models_loaded'] else False,
+            model_loaded=True,  # Models are always loaded in new system
+            anomaly_detected=result['model_predictions']['isolation_anomaly'],
             rule_based_flags=len(result['risk_reasons']),
             timestamp=datetime.now()
         )
         
         LogManager.add_log(log_entry)
-        
+            
         # Add additional context for compatibility
         result['anomalies_detected'] = 1 if result['risk_score'] >= 80 else 0
         result['anomaly_ratio'] = 1.0 if result['risk_score'] >= 80 else 0.0
-        result['model_loaded'] = result['models_loaded']
+        result['model_loaded'] = True  # Models are always loaded in new system
         
         # Add risk assessment breakdown for compatibility
         result['risk_assessment'] = {
             'risk_score': result['risk_score'],
             'risk_level': result['risk_level'],
-            'model_loaded': result['models_loaded'],
-            'model_anomaly_detected': result['model_predictions']['isolation_anomaly'] if result['models_loaded'] else False,
+            'model_loaded': True,  # Models are always loaded in new system
+            'model_anomaly_detected': result['model_predictions']['isolation_anomaly'],
             'rule_based_flags': len(result['risk_reasons']),
             'calculation_breakdown': {
                 'risk_score': result['risk_score'],
