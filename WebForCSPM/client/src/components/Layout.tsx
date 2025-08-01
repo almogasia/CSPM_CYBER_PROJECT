@@ -10,13 +10,17 @@ import {
   SunIcon,
   MoonIcon,
   UserGroupIcon,
+  ExclamationTriangleIcon,
+  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "./Logo";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: HomeIcon },
+  { name: "Urgent Issues", href: "/urgent-issues", icon: ExclamationTriangleIcon },
   { name: "Logs", href: "/logs", icon: DocumentTextIcon },
+  { name: "Analytics", href: "/analytics", icon: ChartBarIcon },
   { name: "Users", href: "/users", icon: UserGroupIcon },
   { name: "Model", href: "/model", icon: ClipboardDocumentListIcon },
   {

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from models import LogEntry, LogManager
 import os
+from datetime import datetime, timedelta
 
 api_bp = Blueprint('api', __name__)
 
@@ -67,6 +68,15 @@ def get_recent_activity():
         })
     except Exception as e:
         return jsonify({'error': f'Failed to fetch recent activity: {str(e)}'}), 500
+
+@api_bp.route('/urgent-issues', methods=['GET'])
+def get_urgent_issues():
+    """Get grouped urgent issues (groups of 3+ logs by user, IP, and time window)"""
+    try:
+        groups = LogManager.get_urgent_issue_groups()
+        return jsonify({'success': True, 'urgent_issues': groups})
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch urgent issues: {str(e)}'}), 500
 
 @api_bp.route('/calculations', methods=['POST'])
 def perform_calculation():
@@ -250,6 +260,45 @@ def model_evaluate():
         
     except Exception as e:
         return jsonify({'error': f'Processing failed: {str(e)}'}), 400
+
+@api_bp.route('/analytics', methods=['GET'])
+def get_analytics():
+    """Get analytics data for visualization and trend analysis"""
+    try:
+        # Mock analytics data - in a real implementation, this would be calculated from logs
+        analytics_data = {
+            'userResourceGraph': [
+                {'user': 'admin', 'resource': 'EC2', 'interactionCount': 45, 'riskScore': 85},
+                {'user': 'admin', 'resource': 'S3', 'interactionCount': 23, 'riskScore': 72},
+                {'user': 'developer', 'resource': 'EC2', 'interactionCount': 12, 'riskScore': 45},
+                {'user': 'developer', 'resource': 'Lambda', 'interactionCount': 8, 'riskScore': 30},
+                {'user': 'root', 'resource': 'IAM', 'interactionCount': 15, 'riskScore': 95},
+                {'user': 'root', 'resource': 'CloudTrail', 'interactionCount': 5, 'riskScore': 88},
+            ],
+            'timeHeatmap': [
+                # Generate 168 data points (24 hours * 7 days)
+                {'hour': i % 24, 'day': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i // 24], 
+                 'riskLevel': 50 + (i % 20), 'activityCount': 10 + (i % 30)}
+                for i in range(168)
+            ],
+            'trendAnalysis': {
+                'dailyTrends': [
+                    # Generate 30 days of trend data
+                    {'date': (datetime.now() - timedelta(days=29-i)).strftime('%Y-%m-%d'),
+                     'totalLogs': 100 + (i * 3), 'highRiskCount': 5 + (i % 10), 
+                     'avgRiskScore': 30 + (i % 20)}
+                    for i in range(30)
+                ],
+                'userActivityTrends': [
+                    {'user': 'admin', 'activityCount': 156, 'riskScore': 78, 'trend': 'increasing'},
+                    {'user': 'developer', 'activityCount': 89, 'riskScore': 45, 'trend': 'stable'},
+                    {'user': 'root', 'activityCount': 23, 'riskScore': 92, 'trend': 'decreasing'},
+                ]
+            }
+        }
+        return jsonify({'success': True, 'analytics': analytics_data})
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
 
 def process_calculation(data):
     """Process CSPM calculations based on input data"""
