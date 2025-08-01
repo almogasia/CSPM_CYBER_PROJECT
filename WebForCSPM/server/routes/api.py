@@ -71,10 +71,18 @@ def get_recent_activity():
 
 @api_bp.route('/urgent-issues', methods=['GET'])
 def get_urgent_issues():
-    """Get grouped urgent issues (groups of 3+ logs by user, IP, and time window)"""
+    """Get all logs for urgent issues page with filtering capabilities"""
     try:
-        groups = LogManager.get_urgent_issue_groups()
-        return jsonify({'success': True, 'urgent_issues': groups})
+        # Get all logs from the database
+        logs = LogManager.get_logs(limit=1000, skip=0)  # Get more logs for urgent issues
+        
+        # Convert ObjectId to string for JSON serialization
+        for log in logs:
+            log['_id'] = str(log['_id'])
+            if 'timestamp' in log and hasattr(log['timestamp'], 'isoformat'):
+                log['timestamp'] = log['timestamp'].isoformat()
+        
+        return jsonify({'success': True, 'urgent_issues': logs})
     except Exception as e:
         return jsonify({'error': f'Failed to fetch urgent issues: {str(e)}'}), 500
 
