@@ -37,14 +37,35 @@ interface DashboardTrends {
 }
 
 interface RecentActivity {
+  _id: string;
+  event_id: string;
   event_name: string;
   timestamp: string;
-  risk_level: string;
+  risk_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
   source_ip: string;
-  user_identity_type?: string;
-  risk_score?: number;
-  anomaly_detected?: boolean;
-  rule_based_flags?: number;
+  user_identity_type: string;
+  risk_score: number;
+  anomaly_detected: boolean;
+  rule_based_flags: number;
+  model_loaded: boolean;
+  // Additional fields from the original log
+  eventID?: string;
+  eventTime?: string;
+  sourceIPAddress?: string;
+  userAgent?: string;
+  eventSource?: string;
+  awsRegion?: string;
+  eventVersion?: string;
+  userIdentitytype?: string;
+  eventType?: string;
+  userIdentityaccountId?: string;
+  userIdentityprincipalId?: string;
+  userIdentityarn?: string;
+  userIdentityaccessKeyId?: string;
+  userIdentityuserName?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  requestParametersinstanceType?: string;
 }
 
 export default function Dashboard() {
@@ -60,15 +81,15 @@ export default function Dashboard() {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      // Fetch stats, trends, and recent activity in parallel
-      const [statsResponse, trendsResponse, activityResponse] = await Promise.all([
+      // Fetch stats, trends, and urgent issues (for top security alerts) in parallel
+      const [statsResponse, trendsResponse, urgentIssuesResponse] = await Promise.all([
         axios.get(`${API_BASE_URL}/logs/stats`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${API_BASE_URL}/logs/trends`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get(`${API_BASE_URL}/logs/recent-activity`, {
+        axios.get(`${API_BASE_URL}/urgent-issues`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -101,42 +122,25 @@ export default function Dashboard() {
         });
       }
       
-      if (activityResponse.data.success) {
-        setRecentActivity(activityResponse.data.activity.slice(0, 5)); // Limit to 5 items
+      if (urgentIssuesResponse.data.success) {
+        // Get the top 3 highest risk logs from all logs
+        const allLogs = urgentIssuesResponse.data.urgent_issues;
+        const topRiskLogs = allLogs
+          .sort((a: any, b: any) => {
+            const riskOrder = { 'CRITICAL': 5, 'HIGH': 4, 'MEDIUM': 3, 'LOW': 2, 'SAFE': 1 };
+            const aOrder = riskOrder[a.risk_level as keyof typeof riskOrder] || 0;
+            const bOrder = riskOrder[b.risk_level as keyof typeof riskOrder] || 0;
+            if (aOrder !== bOrder) {
+              return bOrder - aOrder; // Higher risk first
+            }
+            return b.risk_score - a.risk_score; // Higher score first
+          })
+          .slice(0, 3);
+        
+        setRecentActivity(topRiskLogs);
       } else {
         // Fallback data if no real data is available
-        setRecentActivity([
-          {
-            event_name: "Failed Login Attempt",
-            timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-            risk_level: "HIGH",
-            source_ip: "192.168.1.100",
-            user_identity_type: "Root",
-            risk_score: 8.5,
-            anomaly_detected: true,
-            rule_based_flags: 3
-          },
-          {
-            event_name: "Sensitive Data Access",
-            timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-            risk_level: "MEDIUM",
-            source_ip: "10.0.0.50",
-            user_identity_type: "IAMUser",
-            risk_score: 6.2,
-            anomaly_detected: false,
-            rule_based_flags: 1
-          },
-          {
-            event_name: "File Upload",
-            timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-            risk_level: "LOW",
-            source_ip: "172.16.0.25",
-            user_identity_type: "FederatedUser",
-            risk_score: 2.1,
-            anomaly_detected: false,
-            rule_based_flags: 0
-          }
-        ]);
+        setRecentActivity([]);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch dashboard data");
@@ -150,7 +154,7 @@ export default function Dashboard() {
     fetchDashboardData();
   }, []);
 
-  const getRiskLevelColor = (riskLevel: string) => {
+  const getRiskLevelColor = (riskLevel: RecentActivity["risk_level"]) => {
     switch (riskLevel) {
       case "CRITICAL":
         return "bg-red-900 text-red-100 dark:bg-red-800 dark:text-red-200";
@@ -566,70 +570,70 @@ export default function Dashboard() {
           </span>
         </div>
         <div className="space-y-4">
-          {recentActivity
-            .sort((a, b) => {
-              const riskOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
-              return riskOrder[b.risk_level as keyof typeof riskOrder] - riskOrder[a.risk_level as keyof typeof riskOrder];
-            })
-            .slice(0, 3)
-            .map((activity, index) => (
-              <div key={index} className={`flex items-center p-4 border rounded-lg ${
-                activity.risk_level === 'HIGH' 
-                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+          {recentActivity.map((activity, index) => (
+            <div key={activity._id || index} className={`flex items-center p-4 border rounded-lg ${
+              activity.risk_level === 'CRITICAL' || activity.risk_level === 'HIGH'
+                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                : activity.risk_level === 'MEDIUM'
+                ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+                : activity.risk_level === 'LOW'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            }`}>
+              <ExclamationTriangleIcon className={`h-5 w-5 mr-3 ${
+                activity.risk_level === 'CRITICAL' || activity.risk_level === 'HIGH'
+                  ? 'text-red-500'
                   : activity.risk_level === 'MEDIUM'
-                  ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-                  : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-              }`}>
-                <ExclamationTriangleIcon className={`h-5 w-5 mr-3 ${
-                  activity.risk_level === 'HIGH' 
-                    ? 'text-red-500'
+                  ? 'text-yellow-500'
+                  : activity.risk_level === 'LOW'
+                  ? 'text-blue-500'
+                  : 'text-green-500'
+              }`} />
+              <div className="flex-1">
+                <h3 className={`text-sm font-medium ${
+                  activity.risk_level === 'CRITICAL' || activity.risk_level === 'HIGH'
+                    ? 'text-red-800 dark:text-red-200'
                     : activity.risk_level === 'MEDIUM'
-                    ? 'text-yellow-500'
-                    : 'text-blue-500'
-                }`} />
-                                  <div className="flex-1">
-                    <h3 className={`text-sm font-medium ${
-                      activity.risk_level === 'HIGH' 
-                        ? 'text-red-800 dark:text-red-200'
-                        : activity.risk_level === 'MEDIUM'
-                        ? 'text-yellow-800 dark:text-yellow-200'
-                        : 'text-blue-800 dark:text-blue-200'
-                    }`}>
-                      {activity.event_name}
-                    </h3>
-                    <div className={`text-xs space-y-1 mt-1 ${
-                      activity.risk_level === 'HIGH' 
-                        ? 'text-red-700 dark:text-red-300'
-                        : activity.risk_level === 'MEDIUM'
-                        ? 'text-yellow-700 dark:text-yellow-300'
-                        : 'text-blue-700 dark:text-blue-300'
-                    }`}>
-                      <p>Source IP: {activity.source_ip}</p>
-                      {activity.user_identity_type && (
-                        <p>User: {activity.user_identity_type}</p>
-                      )}
-                      {activity.risk_score && (
-                        <p>Risk Score: {activity.risk_score.toFixed(1)}/100</p>
-                      )}
-                      {activity.anomaly_detected && (
-                        <p className="font-semibold">⚠️ Anomaly Detected</p>
-                      )}
-                      {activity.rule_based_flags && activity.rule_based_flags > 0 && (
-                        <p>Flags: {activity.rule_based_flags} security rules triggered</p>
-                      )}
-                    </div>
-                  </div>
-                <span className={`text-xs ${
-                  activity.risk_level === 'HIGH' 
-                    ? 'text-red-600'
-                    : activity.risk_level === 'MEDIUM'
-                    ? 'text-yellow-600'
-                    : 'text-blue-600'
+                    ? 'text-yellow-800 dark:text-yellow-200'
+                    : activity.risk_level === 'LOW'
+                    ? 'text-blue-800 dark:text-blue-200'
+                    : 'text-green-800 dark:text-green-200'
                 }`}>
-                  {formatTimeAgo(activity.timestamp)}
-                </span>
+                  {activity.event_name}
+                </h3>
+                <div className={`text-xs space-y-1 mt-1 ${
+                  activity.risk_level === 'CRITICAL' || activity.risk_level === 'HIGH'
+                    ? 'text-red-700 dark:text-red-300'
+                    : activity.risk_level === 'MEDIUM'
+                    ? 'text-yellow-700 dark:text-yellow-300'
+                    : activity.risk_level === 'LOW'
+                    ? 'text-blue-700 dark:text-blue-300'
+                    : 'text-green-700 dark:text-green-300'
+                }`}>
+                  <p>Source IP: {activity.source_ip}</p>
+                  <p>User: {activity.user_identity_type}</p>
+                  <p>Risk Score: {activity.risk_score.toFixed(1)}</p>
+                  {activity.anomaly_detected && (
+                    <p className="font-semibold">⚠️ Anomaly Detected</p>
+                  )}
+                  {activity.rule_based_flags > 0 && (
+                    <p>Flags: {activity.rule_based_flags} security rules triggered</p>
+                  )}
+                </div>
               </div>
-            ))}
+              <span className={`text-xs ${
+                activity.risk_level === 'CRITICAL' || activity.risk_level === 'HIGH'
+                  ? 'text-red-600'
+                  : activity.risk_level === 'MEDIUM'
+                  ? 'text-yellow-600'
+                  : activity.risk_level === 'LOW'
+                  ? 'text-blue-600'
+                  : 'text-green-600'
+              }`}>
+                {formatTimeAgo(activity.timestamp)}
+              </span>
+            </div>
+          ))}
           {recentActivity.length === 0 && (
             <div className="text-center py-8">
               <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-gray-400" />
