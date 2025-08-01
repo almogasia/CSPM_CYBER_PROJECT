@@ -9,27 +9,36 @@ api_bp = Blueprint('api', __name__)
 def get_logs():
     """Get logs with pagination"""
     try:
-        page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 100))
-        skip = (page - 1) * limit
+        from middleware import auth_middleware
         
-        logs = LogManager.get_logs(limit=limit, skip=skip)
-        total_count = LogManager.get_logs_count()
+        @auth_middleware
+        def protected_route():
+            page = int(request.args.get('page', 1))
+            limit = int(request.args.get('limit', 100))
+            skip = (page - 1) * limit
+            
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            logs = LogManager.get_logs(limit=limit, skip=skip, user_id=user_id)
+            total_count = LogManager.get_logs_count(user_id=user_id)
+            
+            # Convert ObjectId to string for JSON serialization
+            for log in logs:
+                log['_id'] = str(log['_id'])
+                if 'timestamp' in log:
+                    log['timestamp'] = log['timestamp'].isoformat()
+            
+            return jsonify({
+                'success': True,
+                'logs': logs,
+                'total_count': total_count,
+                'page': page,
+                'limit': limit,
+                'total_pages': (total_count + limit - 1) // limit
+            })
         
-        # Convert ObjectId to string for JSON serialization
-        for log in logs:
-            log['_id'] = str(log['_id'])
-            if 'timestamp' in log:
-                log['timestamp'] = log['timestamp'].isoformat()
-        
-        return jsonify({
-            'success': True,
-            'logs': logs,
-            'total_count': total_count,
-            'page': page,
-            'limit': limit,
-            'total_pages': (total_count + limit - 1) // limit
-        })
+        return protected_route()
     except Exception as e:
         return jsonify({'error': f'Failed to fetch logs: {str(e)}'}), 500
 
@@ -37,11 +46,20 @@ def get_logs():
 def get_logs_stats():
     """Get aggregated statistics from logs"""
     try:
-        stats = LogManager.get_stats()
-        return jsonify({
-            'success': True,
-            'stats': stats
-        })
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            stats = LogManager.get_stats(user_id=user_id)
+            return jsonify({
+                'success': True,
+                'stats': stats
+            })
+        
+        return protected_route()
     except Exception as e:
         return jsonify({'error': f'Failed to fetch stats: {str(e)}'}), 500
 
@@ -49,11 +67,20 @@ def get_logs_stats():
 def get_logs_trends():
     """Get trend data for the last 24 hours vs previous 24 hours"""
     try:
-        trends = LogManager.get_trends()
-        return jsonify({
-            'success': True,
-            'trends': trends
-        })
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            trends = LogManager.get_trends(user_id=user_id)
+            return jsonify({
+                'success': True,
+                'trends': trends
+            })
+        
+        return protected_route()
     except Exception as e:
         return jsonify({'error': f'Failed to fetch trends: {str(e)}'}), 500
 
@@ -61,11 +88,20 @@ def get_logs_trends():
 def get_recent_activity():
     """Get recent activity for the last 24 hours"""
     try:
-        activity = LogManager.get_recent_activity()
-        return jsonify({
-            'success': True,
-            'activity': activity
-        })
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            activity = LogManager.get_recent_activity(user_id=user_id)
+            return jsonify({
+                'success': True,
+                'activity': activity
+            })
+        
+        return protected_route()
     except Exception as e:
         return jsonify({'error': f'Failed to fetch recent activity: {str(e)}'}), 500
 
@@ -73,16 +109,25 @@ def get_recent_activity():
 def get_urgent_issues():
     """Get all logs for urgent issues page with filtering capabilities"""
     try:
-        # Get all logs from the database
-        logs = LogManager.get_logs(limit=1000, skip=0)  # Get more logs for urgent issues
+        from middleware import auth_middleware
         
-        # Convert ObjectId to string for JSON serialization
-        for log in logs:
-            log['_id'] = str(log['_id'])
-            if 'timestamp' in log and hasattr(log['timestamp'], 'isoformat'):
-                log['timestamp'] = log['timestamp'].isoformat()
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Get all logs from the database for this user
+            logs = LogManager.get_logs(limit=1000, skip=0, user_id=user_id)  # Get more logs for urgent issues
+            
+            # Convert ObjectId to string for JSON serialization
+            for log in logs:
+                log['_id'] = str(log['_id'])
+                if 'timestamp' in log and hasattr(log['timestamp'], 'isoformat'):
+                    log['timestamp'] = log['timestamp'].isoformat()
+            
+            return jsonify({'success': True, 'urgent_issues': logs})
         
-        return jsonify({'success': True, 'urgent_issues': logs})
+        return protected_route()
     except Exception as e:
         return jsonify({'error': f'Failed to fetch urgent issues: {str(e)}'}), 500
 
@@ -110,69 +155,79 @@ def get_data():
 def process_random_log():
     """Process a random log from aws_logs.txt using the new multi-model system"""
     try:
-        import random
-        from model import MultiModelCSPM
-        from datetime import datetime
+        from middleware import auth_middleware
         
-        # Read aws_logs.txt
-        with open('aws_logs.txt', 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+        @auth_middleware
+        def protected_route():
+            import random
+            from model import MultiModelCSPM
+            from datetime import datetime
+            
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Read aws_logs.txt
+            with open('aws_logs.txt', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            if not lines:
+                return jsonify({'error': 'No logs found in aws_logs.txt'}), 400
+            
+            # Select a random line - the model will handle parsing
+            random_line = random.choice(lines).strip()
+            
+            # Initialize the multi-model CSPM system
+            cspm = MultiModelCSPM()
+            
+            # Evaluate the log - model handles all parsing internally
+            result = cspm.evaluate_log(random_line)
+            
+            if not result['success']:
+                return jsonify({'error': result['error']}), 400
+            
+            # Save log to MongoDB using the parsed features from the model
+            input_features = result['input_features']
+            log_entry = LogEntry(
+                event_id=input_features['eventID'],
+                event_name=input_features['eventName'],
+                user_identity_type=input_features['userIdentitytype'],
+                source_ip=input_features['sourceIPAddress'],
+                risk_score=result['risk_score'],
+                risk_level=result['risk_level'],
+                model_loaded=True,  # Models are always loaded in new system
+                anomaly_detected=result['model_predictions']['anomaly_detected'],
+                rule_based_flags=len(result['risk_reasons']),
+                timestamp=datetime.now(),
+                user_id=user_id,  # Associate with the authenticated user
+                # Pass all 18 features
+                eventID=input_features['eventID'],
+                eventTime=input_features['eventTime'],
+                sourceIPAddress=input_features['sourceIPAddress'],
+                userAgent=input_features['userAgent'],
+                eventName=input_features['eventName'],
+                eventSource=input_features['eventSource'],
+                awsRegion=input_features['awsRegion'],
+                eventVersion=input_features['eventVersion'],
+                userIdentitytype=input_features['userIdentitytype'],
+                eventType=input_features['eventType'],
+                userIdentityaccountId=input_features['userIdentityaccountId'],
+                userIdentityprincipalId=input_features['userIdentityprincipalId'],
+                userIdentityarn=input_features['userIdentityarn'],
+                userIdentityaccessKeyId=input_features['userIdentityaccessKeyId'],
+                userIdentityuserName=input_features['userIdentityuserName'],
+                errorCode=input_features['errorCode'],
+                errorMessage=input_features['errorMessage'],
+                requestParametersinstanceType=input_features['requestParametersinstanceType']
+            )
+            
+            LogManager.add_log(log_entry)
+            
+            # Add the original log data to the result
+            result['original_log'] = random_line
+            
+            return jsonify(result)
         
-        if not lines:
-            return jsonify({'error': 'No logs found in aws_logs.txt'}), 400
-        
-        # Select a random line - the model will handle parsing
-        random_line = random.choice(lines).strip()
-        
-        # Initialize the multi-model CSPM system
-        cspm = MultiModelCSPM()
-        
-        # Evaluate the log - model handles all parsing internally
-        result = cspm.evaluate_log(random_line)
-        
-        if not result['success']:
-            return jsonify({'error': result['error']}), 400
-        
-        # Save log to MongoDB using the parsed features from the model
-        input_features = result['input_features']
-        log_entry = LogEntry(
-            event_id=input_features['eventID'],
-            event_name=input_features['eventName'],
-            user_identity_type=input_features['userIdentitytype'],
-            source_ip=input_features['sourceIPAddress'],
-            risk_score=result['risk_score'],
-            risk_level=result['risk_level'],
-            model_loaded=True,  # Models are always loaded in new system
-            anomaly_detected=result['model_predictions']['anomaly_detected'],
-            rule_based_flags=len(result['risk_reasons']),
-            timestamp=datetime.now(),
-            # Pass all 18 features
-            eventID=input_features['eventID'],
-            eventTime=input_features['eventTime'],
-            sourceIPAddress=input_features['sourceIPAddress'],
-            userAgent=input_features['userAgent'],
-            eventName=input_features['eventName'],
-            eventSource=input_features['eventSource'],
-            awsRegion=input_features['awsRegion'],
-            eventVersion=input_features['eventVersion'],
-            userIdentitytype=input_features['userIdentitytype'],
-            eventType=input_features['eventType'],
-            userIdentityaccountId=input_features['userIdentityaccountId'],
-            userIdentityprincipalId=input_features['userIdentityprincipalId'],
-            userIdentityarn=input_features['userIdentityarn'],
-            userIdentityaccessKeyId=input_features['userIdentityaccessKeyId'],
-            userIdentityuserName=input_features['userIdentityuserName'],
-            errorCode=input_features['errorCode'],
-            errorMessage=input_features['errorMessage'],
-            requestParametersinstanceType=input_features['requestParametersinstanceType']
-        )
-        
-        LogManager.add_log(log_entry)
-        
-        # Add the original log data to the result
-        result['original_log'] = random_line
-        
-        return jsonify(result)
+        return protected_route()
         
     except FileNotFoundError:
         return jsonify({'error': 'aws_logs.txt not found'}), 404
@@ -182,89 +237,99 @@ def process_random_log():
 @api_bp.route('/model-evaluate', methods=['POST'])
 def model_evaluate():
     """Evaluate a log using the new multi-model CSPM system"""
-    from model import MultiModelCSPM
-    from datetime import datetime
-    
-    data = request.json
-    
-    # Handle both string format (pipe-separated) and list format
-    if isinstance(data, list):
-        if len(data) != 18:
-            return jsonify({'error': 'Input must be a list of 18 features'}), 400
-        # Convert list to pipe-separated string
-        log_data = '|'.join(str(feature) for feature in data)
-    elif isinstance(data, str):
-        log_data = data
-    else:
-        return jsonify({'error': 'Input must be a list of 18 features or a pipe-separated string'}), 400
-    
     try:
-        # Initialize the multi-model CSPM system
-        cspm = MultiModelCSPM()
+        from middleware import auth_middleware
         
-        # Evaluate the log - model handles all parsing internally
-        result = cspm.evaluate_log(log_data)
-        
-        if not result['success']:
-            return jsonify({'error': result['error']}), 400
-        
-        # Save log to MongoDB using the parsed features from the model
-        input_features = result['input_features']
-        log_entry = LogEntry(
-            event_id=input_features['eventID'],
-            event_name=input_features['eventName'],
-            user_identity_type=input_features['userIdentitytype'],
-            source_ip=input_features['sourceIPAddress'],
-            risk_score=result['risk_score'],
-            risk_level=result['risk_level'],
-            model_loaded=True,  # Models are always loaded in new system
-            anomaly_detected=result['model_predictions']['anomaly_detected'],
-            rule_based_flags=len(result['risk_reasons']),
-            timestamp=datetime.now(),
-            # Pass all 18 features
-            eventID=input_features['eventID'],
-            eventTime=input_features['eventTime'],
-            sourceIPAddress=input_features['sourceIPAddress'],
-            userAgent=input_features['userAgent'],
-            eventName=input_features['eventName'],
-            eventSource=input_features['eventSource'],
-            awsRegion=input_features['awsRegion'],
-            eventVersion=input_features['eventVersion'],
-            userIdentitytype=input_features['userIdentitytype'],
-            eventType=input_features['eventType'],
-            userIdentityaccountId=input_features['userIdentityaccountId'],
-            userIdentityprincipalId=input_features['userIdentityprincipalId'],
-            userIdentityarn=input_features['userIdentityarn'],
-            userIdentityaccessKeyId=input_features['userIdentityaccessKeyId'],
-            userIdentityuserName=input_features['userIdentityuserName'],
-            errorCode=input_features['errorCode'],
-            errorMessage=input_features['errorMessage'],
-            requestParametersinstanceType=input_features['requestParametersinstanceType']
-        )
-        
-        LogManager.add_log(log_entry)
+        @auth_middleware
+        def protected_route():
+            from model import MultiModelCSPM
+            from datetime import datetime
             
-        # Add additional context for compatibility
-        result['anomalies_detected'] = 1 if result['risk_score'] >= 80 else 0
-        result['anomaly_ratio'] = 1.0 if result['risk_score'] >= 80 else 0.0
-        result['model_loaded'] = True  # Models are always loaded in new system
-        
-        # Add risk assessment breakdown for compatibility
-        result['risk_assessment'] = {
-            'risk_score': result['risk_score'],
-            'risk_level': result['risk_level'],
-            'model_loaded': True,  # Models are always loaded in new system
-            'model_anomaly_detected': result['model_predictions']['anomaly_detected'],
-            'rule_based_flags': len(result['risk_reasons']),
-            'calculation_breakdown': {
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            data = request.json
+            
+            # Handle both string format (pipe-separated) and list format
+            if isinstance(data, list):
+                if len(data) != 18:
+                    return jsonify({'error': 'Input must be a list of 18 features'}), 400
+                # Convert list to pipe-separated string
+                log_data = '|'.join(str(feature) for feature in data)
+            elif isinstance(data, str):
+                log_data = data
+            else:
+                return jsonify({'error': 'Input must be a list of 18 features or a pipe-separated string'}), 400
+            
+            # Initialize the multi-model CSPM system
+            cspm = MultiModelCSPM()
+            
+            # Evaluate the log - model handles all parsing internally
+            result = cspm.evaluate_log(log_data)
+            
+            if not result['success']:
+                return jsonify({'error': result['error']}), 400
+            
+            # Save log to MongoDB using the parsed features from the model
+            input_features = result['input_features']
+            log_entry = LogEntry(
+                event_id=input_features['eventID'],
+                event_name=input_features['eventName'],
+                user_identity_type=input_features['userIdentitytype'],
+                source_ip=input_features['sourceIPAddress'],
+                risk_score=result['risk_score'],
+                risk_level=result['risk_level'],
+                model_loaded=True,  # Models are always loaded in new system
+                anomaly_detected=result['model_predictions']['anomaly_detected'],
+                rule_based_flags=len(result['risk_reasons']),
+                timestamp=datetime.now(),
+                user_id=user_id,  # Associate with the authenticated user
+                # Pass all 18 features
+                eventID=input_features['eventID'],
+                eventTime=input_features['eventTime'],
+                sourceIPAddress=input_features['sourceIPAddress'],
+                userAgent=input_features['userAgent'],
+                eventName=input_features['eventName'],
+                eventSource=input_features['eventSource'],
+                awsRegion=input_features['awsRegion'],
+                eventVersion=input_features['eventVersion'],
+                userIdentitytype=input_features['userIdentitytype'],
+                eventType=input_features['eventType'],
+                userIdentityaccountId=input_features['userIdentityaccountId'],
+                userIdentityprincipalId=input_features['userIdentityprincipalId'],
+                userIdentityarn=input_features['userIdentityarn'],
+                userIdentityaccessKeyId=input_features['userIdentityaccessKeyId'],
+                userIdentityuserName=input_features['userIdentityuserName'],
+                errorCode=input_features['errorCode'],
+                errorMessage=input_features['errorMessage'],
+                requestParametersinstanceType=input_features['requestParametersinstanceType']
+            )
+            
+            LogManager.add_log(log_entry)
+            
+            # Add additional context for compatibility
+            result['anomalies_detected'] = 1 if result['risk_score'] >= 80 else 0
+            result['anomaly_ratio'] = 1.0 if result['risk_score'] >= 80 else 0.0
+            result['model_loaded'] = True  # Models are always loaded in new system
+            
+            # Add risk assessment breakdown for compatibility
+            result['risk_assessment'] = {
                 'risk_score': result['risk_score'],
                 'risk_level': result['risk_level'],
-                'model_predictions': result['model_predictions'],
-                'risk_reasons': result['risk_reasons']
+                'model_loaded': True,  # Models are always loaded in new system
+                'model_anomaly_detected': result['model_predictions']['anomaly_detected'],
+                'rule_based_flags': len(result['risk_reasons']),
+                'calculation_breakdown': {
+                    'risk_score': result['risk_score'],
+                    'risk_level': result['risk_level'],
+                    'model_predictions': result['model_predictions'],
+                    'risk_reasons': result['risk_reasons']
+                }
             }
-        }
+            
+            return jsonify(result)
         
-        return jsonify(result)
+        return protected_route()
         
     except Exception as e:
         return jsonify({'error': f'Processing failed: {str(e)}'}), 400
@@ -273,38 +338,67 @@ def model_evaluate():
 def get_analytics():
     """Get analytics data for visualization and trend analysis"""
     try:
-        # Mock analytics data - in a real implementation, this would be calculated from logs
-        analytics_data = {
-            'userResourceGraph': [
-                {'user': 'admin', 'resource': 'EC2', 'interactionCount': 45, 'riskScore': 85},
-                {'user': 'admin', 'resource': 'S3', 'interactionCount': 23, 'riskScore': 72},
-                {'user': 'developer', 'resource': 'EC2', 'interactionCount': 12, 'riskScore': 45},
-                {'user': 'developer', 'resource': 'Lambda', 'interactionCount': 8, 'riskScore': 30},
-                {'user': 'root', 'resource': 'IAM', 'interactionCount': 15, 'riskScore': 95},
-                {'user': 'root', 'resource': 'CloudTrail', 'interactionCount': 5, 'riskScore': 88},
-            ],
-            'timeHeatmap': [
-                # Generate 168 data points (24 hours * 7 days)
-                {'hour': i % 24, 'day': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i // 24], 
-                 'riskLevel': 50 + (i % 20), 'activityCount': 10 + (i % 30)}
-                for i in range(168)
-            ],
-            'trendAnalysis': {
-                'dailyTrends': [
-                    # Generate 30 days of trend data
-                    {'date': (datetime.now() - timedelta(days=29-i)).strftime('%Y-%m-%d'),
-                     'totalLogs': 100 + (i * 3), 'highRiskCount': 5 + (i % 10), 
-                     'avgRiskScore': 30 + (i % 20)}
-                    for i in range(30)
-                ],
-                'userActivityTrends': [
-                    {'user': 'admin', 'activityCount': 156, 'riskScore': 78, 'trend': 'increasing'},
-                    {'user': 'developer', 'activityCount': 89, 'riskScore': 45, 'trend': 'stable'},
-                    {'user': 'root', 'activityCount': 23, 'riskScore': 92, 'trend': 'decreasing'},
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Get user's logs for analytics
+            user_logs = LogManager.get_logs(limit=1000, skip=0, user_id=user_id)
+            
+            # Calculate analytics based on user's actual logs
+            user_resource_data = []
+            if user_logs:
+                # Group by event_name (resource) and calculate metrics
+                resource_stats = {}
+                for log in user_logs:
+                    resource = log.get('event_name', 'Unknown')
+                    if resource not in resource_stats:
+                        resource_stats[resource] = {'count': 0, 'total_risk': 0}
+                    resource_stats[resource]['count'] += 1
+                    resource_stats[resource]['total_risk'] += log.get('risk_score', 0)
+                
+                for resource, stats in resource_stats.items():
+                    user_resource_data.append({
+                        'user': 'You',  # Since it's user-specific
+                        'resource': resource,
+                        'interactionCount': stats['count'],
+                        'riskScore': stats['total_risk'] / stats['count'] if stats['count'] > 0 else 0
+                    })
+            else:
+                # Fallback data if no logs
+                user_resource_data = [
+                    {'user': 'You', 'resource': 'EC2', 'interactionCount': 0, 'riskScore': 0},
+                    {'user': 'You', 'resource': 'S3', 'interactionCount': 0, 'riskScore': 0},
                 ]
+            
+            # Mock analytics data - in a real implementation, this would be calculated from user's logs
+            analytics_data = {
+                'userResourceGraph': user_resource_data,
+                'timeHeatmap': [
+                    # Generate 168 data points (24 hours * 7 days)
+                    {'hour': i % 24, 'day': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i // 24], 
+                     'riskLevel': 50 + (i % 20), 'activityCount': 10 + (i % 30)}
+                    for i in range(168)
+                ],
+                'trendAnalysis': {
+                    'dailyTrends': [
+                        # Generate 30 days of trend data
+                        {'date': (datetime.now() - timedelta(days=29-i)).strftime('%Y-%m-%d'),
+                         'totalLogs': 100 + (i * 3), 'highRiskCount': 5 + (i % 10), 
+                         'avgRiskScore': 30 + (i % 20)}
+                        for i in range(30)
+                    ],
+                    'userActivityTrends': [
+                        {'user': 'You', 'activityCount': len(user_logs), 'riskScore': sum(log.get('risk_score', 0) for log in user_logs) / len(user_logs) if user_logs else 0, 'trend': 'stable'},
+                    ]
+                }
             }
-        }
-        return jsonify({'success': True, 'analytics': analytics_data})
+            return jsonify({'success': True, 'analytics': analytics_data})
+        
+        return protected_route()
     except Exception as e:
         return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
 

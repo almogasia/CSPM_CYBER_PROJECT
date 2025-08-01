@@ -24,6 +24,7 @@ interface DashboardStats {
   high_risk_count: number;
   medium_risk_count: number;
   low_risk_count: number;
+  critical_risk_count: number;
   anomaly_count: number;
   root_user_count: number;
 }
@@ -97,35 +98,21 @@ export default function Dashboard() {
       if (statsResponse.data.success) {
         setStats(statsResponse.data.stats);
       } else {
-        // Fallback stats if no real data is available
-        setStats({
-          total_logs: 1247,
-          avg_risk_score: 3.2,
-          high_risk_count: 23,
-          medium_risk_count: 156,
-          low_risk_count: 1068,
-          anomaly_count: 8,
-          root_user_count: 12
-        });
+        setStats(null);
       }
       
       if (trendsResponse.data.success) {
         setTrends(trendsResponse.data.trends);
       } else {
-        // Fallback trends if no real data is available
-        setTrends({
-          total_change: 12.5,
-          high_risk_change: -5.2,
-          medium_risk_change: 8.7,
-          anomalies_change: 15.3,
-          root_users_change: -2.1
-        });
+        setTrends(null);
       }
       
       if (urgentIssuesResponse.data.success) {
-        // Get the top 3 highest risk logs from all logs
-        const allLogs = urgentIssuesResponse.data.urgent_issues;
-        const topRiskLogs = allLogs
+        // Get the top 3 highest risk logs from user's logs
+        const userLogs = urgentIssuesResponse.data.urgent_issues;
+        console.log('User logs for security alerts:', userLogs); // Debug log
+        
+        const topRiskLogs = userLogs
           .sort((a: any, b: any) => {
             const riskOrder = { 'CRITICAL': 5, 'HIGH': 4, 'MEDIUM': 3, 'LOW': 2, 'SAFE': 1 };
             const aOrder = riskOrder[a.risk_level as keyof typeof riskOrder] || 0;
@@ -137,9 +124,9 @@ export default function Dashboard() {
           })
           .slice(0, 3);
         
+        console.log('Top 3 security alerts:', topRiskLogs); // Debug log
         setRecentActivity(topRiskLogs);
       } else {
-        // Fallback data if no real data is available
         setRecentActivity([]);
       }
     } catch (err: any) {
@@ -231,7 +218,7 @@ export default function Dashboard() {
       )}
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
           <div className="flex items-center">
             <div className="flex-shrink-0">
@@ -258,6 +245,24 @@ export default function Dashboard() {
                   </span>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-red-900 dark:bg-red-800 rounded-lg flex items-center justify-center">
+                <ExclamationTriangleIcon className="h-5 w-5 text-red-100 dark:text-red-200" />
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                Critical Risk Events
+              </p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats?.critical_risk_count || 0}
+              </p>
             </div>
           </div>
         </div>

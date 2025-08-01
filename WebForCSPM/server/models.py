@@ -20,7 +20,7 @@ stats_collection = db.stats
 class LogEntry:
     def __init__(self, event_id, event_name, user_identity_type, source_ip, 
                  risk_score, risk_level, model_loaded, anomaly_detected, 
-                 rule_based_flags, timestamp=None, **kwargs):
+                 rule_based_flags, timestamp=None, user_id=None, **kwargs):
         self.event_id = event_id
         self.event_name = event_name
         self.user_identity_type = user_identity_type
@@ -31,6 +31,7 @@ class LogEntry:
         self.anomaly_detected = anomaly_detected
         self.rule_based_flags = rule_based_flags
         self.timestamp = timestamp or datetime.utcnow()
+        self.user_id = user_id  # Associate log with specific user
         
         # Store all 18 features from the original log
         self.eventID = kwargs.get('eventID')
@@ -63,6 +64,7 @@ class LogEntry:
             'anomaly_detected': self.anomaly_detected,
             'rule_based_flags': self.rule_based_flags,
             'timestamp': self.timestamp,
+            'user_id': self.user_id,  # Include user_id in the dictionary
             # All 18 features from the original log
             'eventID': self.eventID,
             'eventTime': self.eventTime,
@@ -95,29 +97,48 @@ class LogEntry:
             model_loaded=data.get('model_loaded'),
             anomaly_detected=data.get('anomaly_detected'),
             rule_based_flags=data.get('rule_based_flags'),
-            timestamp=data.get('timestamp')
+            timestamp=data.get('timestamp'),
+            user_id=data.get('user_id')
         )
 
 class LogManager:
     @staticmethod
     def add_log(log_entry):
-        """Add a new log entry and maintain only the latest 100 logs"""
+        """Add a new log entry and maintain only the latest 100 logs per user"""
         try:
+            # Get user_id from the log entry
+            user_id = log_entry.user_id
+            
             # Insert the new log
             logs_collection.insert_one(log_entry.to_dict())
             
-            # Count total logs
-            total_logs = logs_collection.count_documents({})
+            # Update user's log count atomically using MongoDB's atomic operations
+            from pymongo import UpdateOne
+            from bson import ObjectId
             
-            # If we have more than 100 logs, remove the oldest ones
-            if total_logs > 100:
-                # Find the oldest logs to remove
-                oldest_logs = logs_collection.find().sort('timestamp', 1).limit(total_logs - 100)
-                oldest_ids = [log['_id'] for log in oldest_logs]
-                
-                # Remove the oldest logs
-                if oldest_ids:
-                    logs_collection.delete_many({'_id': {'$in': oldest_ids}})
+            # Increment the log count and get the new value atomically
+            result = users_collection.find_one_and_update(
+                {'_id': ObjectId(user_id)},
+                {'$inc': {'log_count': 1}},
+                return_document=True
+            )
+            
+            if result and result.get('log_count', 0) > 100:
+                # We're over the limit, do cleanup
+                newest_100 = list(logs_collection.find({'user_id': user_id}).sort('timestamp', -1).limit(100))
+                if newest_100:
+                    cutoff_timestamp = newest_100[-1]['timestamp']
+                    # Delete everything older than the 100th newest log
+                    deleted_count = logs_collection.delete_many({
+                        'user_id': user_id,
+                        'timestamp': {'$lt': cutoff_timestamp}
+                    }).deleted_count
+                    
+                    # Reset the log count to 100
+                    users_collection.update_one(
+                        {'_id': ObjectId(user_id)},
+                        {'$set': {'log_count': 100}}
+                    )
             
             return True
         except Exception as e:
@@ -125,55 +146,69 @@ class LogManager:
             return False
     
     @staticmethod
-    def get_logs(limit=50, skip=0):
-        """Get logs with pagination"""
+    def get_logs(limit=50, skip=0, user_id=None):
+        """Get logs with pagination, filtered by user if specified"""
         try:
-            logs = list(logs_collection.find().sort('timestamp', -1).skip(skip).limit(limit))
+            query = {}
+            if user_id:
+                query['user_id'] = user_id
+            
+            logs = list(logs_collection.find(query).sort('timestamp', -1).skip(skip).limit(limit))
             return logs
         except Exception as e:
             print(f"Error getting logs: {e}")
             return []
     
     @staticmethod
-    def get_logs_count():
-        """Get total number of logs"""
+    def get_logs_count(user_id=None):
+        """Get total number of logs, filtered by user if specified"""
         try:
-            return logs_collection.count_documents({})
+            query = {}
+            if user_id:
+                query['user_id'] = user_id
+            
+            return logs_collection.count_documents(query)
         except Exception as e:
             print(f"Error getting logs count: {e}")
             return 0
     
     @staticmethod
-    def get_stats():
-        """Get aggregated statistics from logs"""
+    def get_stats(user_id=None):
+        """Get aggregated statistics from logs, filtered by user if specified"""
         try:
-            pipeline = [
-                {
-                    '$group': {
-                        '_id': None,
-                        'total_logs': {'$sum': 1},
-                        'avg_risk_score': {'$avg': '$risk_score'},
-                        'high_risk_count': {
-                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'HIGH']}, 1, 0]}
-                        },
-                        'medium_risk_count': {
-                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'MEDIUM']}, 1, 0]}
-                        },
-                        'low_risk_count': {
-                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'LOW']}, 1, 0]}
-                        },
-                        'critical_risk_count': {
-                            '$sum': {'$cond': [{'$eq': ['$risk_level', 'CRITICAL']}, 1, 0]}
-                        },
-                        'anomaly_count': {
-                            '$sum': {'$cond': ['$anomaly_detected', 1, 0]}
-                        },
-                        'root_user_count': {
-                            '$sum': {'$cond': [{'$eq': ['$user_identity_type', 'Root']}, 1, 0]}
-                        }
+            match_stage = {}
+            if user_id:
+                match_stage['user_id'] = user_id
+            
+            pipeline = []
+            if match_stage:
+                pipeline.append({'$match': match_stage})
+            
+            pipeline.append({
+                '$group': {
+                    '_id': None,
+                    'total_logs': {'$sum': 1},
+                    'avg_risk_score': {'$avg': '$risk_score'},
+                    'high_risk_count': {
+                        '$sum': {'$cond': [{'$eq': ['$risk_level', 'HIGH']}, 1, 0]}
+                    },
+                    'medium_risk_count': {
+                        '$sum': {'$cond': [{'$eq': ['$risk_level', 'MEDIUM']}, 1, 0]}
+                    },
+                    'low_risk_count': {
+                        '$sum': {'$cond': [{'$eq': ['$risk_level', 'LOW']}, 1, 0]}
+                    },
+                    'critical_risk_count': {
+                        '$sum': {'$cond': [{'$eq': ['$risk_level', 'CRITICAL']}, 1, 0]}
+                    },
+                    'anomaly_count': {
+                        '$sum': {'$cond': ['$anomaly_detected', 1, 0]}
+                    },
+                    'root_user_count': {
+                        '$sum': {'$cond': [{'$eq': ['$user_identity_type', 'Root']}, 1, 0]}
                     }
                 }
-            ]
+            })
             
             result = list(logs_collection.aggregate(pipeline))
             if result:
@@ -203,8 +238,8 @@ class LogManager:
             }
     
     @staticmethod
-    def get_trends():
-        """Calculate trend percentages for the last 24 hours vs previous 24 hours"""
+    def get_trends(user_id=None):
+        """Calculate trend percentages for the last 24 hours vs previous 24 hours, filtered by user if specified"""
         try:
             from datetime import datetime, timedelta
             
@@ -212,9 +247,17 @@ class LogManager:
             yesterday = now - timedelta(days=1)
             two_days_ago = now - timedelta(days=2)
             
+            # Build match conditions
+            current_match = {'timestamp': {'$gte': yesterday}}
+            previous_match = {'timestamp': {'$gte': two_days_ago, '$lt': yesterday}}
+            
+            if user_id:
+                current_match['user_id'] = user_id
+                previous_match['user_id'] = user_id
+            
             # Current 24 hours
             current_pipeline = [
-                {'$match': {'timestamp': {'$gte': yesterday}}},
+                {'$match': current_match},
                 {
                     '$group': {
                         '_id': None,
@@ -237,7 +280,7 @@ class LogManager:
             
             # Previous 24 hours
             previous_pipeline = [
-                {'$match': {'timestamp': {'$gte': two_days_ago, '$lt': yesterday}}},
+                {'$match': previous_match},
                 {
                     '$group': {
                         '_id': None,
@@ -297,16 +340,19 @@ class LogManager:
             }
     
     @staticmethod
-    def get_recent_activity():
-        """Get recent activity for the last 24 hours"""
+    def get_recent_activity(user_id=None):
+        """Get recent activity for the last 24 hours, filtered by user if specified"""
         try:
             from datetime import datetime, timedelta
             yesterday = datetime.utcnow() - timedelta(days=1)
             
+            # Build query
+            query = {'timestamp': {'$gte': yesterday}}
+            if user_id:
+                query['user_id'] = user_id
+            
             # Get the most recent log entries from the last 24 hours
-            recent_logs = list(logs_collection.find(
-                {'timestamp': {'$gte': yesterday}}
-            ).sort('timestamp', -1).limit(10))
+            recent_logs = list(logs_collection.find(query).sort('timestamp', -1).limit(10))
             
             # Convert to the format expected by the frontend
             activity = []
@@ -328,13 +374,19 @@ class LogManager:
             return []
 
     @staticmethod
-    def get_urgent_issue_groups(time_window_minutes=10, min_group_size=3):
+    def get_urgent_issue_groups(time_window_minutes=10, min_group_size=3, user_id=None):
         """Group logs by user_identity_type, source_ip, and time window. Return groups with >= min_group_size logs."""
         try:
             from datetime import datetime, timedelta
             from bson import ObjectId
+            
+            # Build query
+            query = {}
+            if user_id:
+                query['user_id'] = user_id
+            
             # Fetch all logs sorted by timestamp ascending
-            logs = list(logs_collection.find().sort('timestamp', 1))
+            logs = list(logs_collection.find(query).sort('timestamp', 1))
             groups = []
             used = set()
             for i, log in enumerate(logs):
@@ -391,11 +443,12 @@ class LogManager:
 
 # User model for authentication
 class User:
-    def __init__(self, name, email, password=None, _id=None):
+    def __init__(self, name, email, password=None, _id=None, log_count=0):
         self.name = name
         self.email = email.lower() if email else None
         self.password = password
         self._id = _id
+        self.log_count = log_count
     
     @staticmethod
     def find_by_email(email):
@@ -406,7 +459,8 @@ class User:
                 name=user_data['name'],
                 email=user_data['email'],
                 password=user_data['password'],
-                _id=user_data['_id']
+                _id=user_data['_id'],
+                log_count=user_data.get('log_count', 0)
             )
         return None
     
@@ -420,7 +474,8 @@ class User:
                 name=user_data['name'],
                 email=user_data['email'],
                 password=user_data['password'],
-                _id=user_data['_id']
+                _id=user_data['_id'],
+                log_count=user_data.get('log_count', 0)
             )
         return None
     
@@ -429,7 +484,8 @@ class User:
         user_data = {
             "name": self.name,
             "email": self.email,
-            "password": self.password
+            "password": self.password,
+            "log_count": self.log_count
         }
         if self._id:
             # Update existing user

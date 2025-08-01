@@ -19,16 +19,16 @@ const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://local
 
 interface Log {
   _id: string;
-  event_id: string;
-  event_name: string;
-  user_identity_type: string;
-  source_ip: string;
-  risk_score: number;
+    event_id: string;
+    event_name: string;
+    user_identity_type: string;
+    source_ip: string;
+    risk_score: number;
   risk_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
-  model_loaded: boolean;
-  anomaly_detected: boolean;
-  rule_based_flags: number;
-  timestamp: string;
+    model_loaded: boolean;
+    anomaly_detected: boolean;
+    rule_based_flags: number;
+    timestamp: string;
   // Additional fields from the original log
   eventID?: string;
   eventTime?: string;
@@ -287,7 +287,7 @@ export default function UrgentIssue() {
       {/* Header Section */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
+        <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
               <ShieldExclamationIcon className="h-8 w-8 text-red-500" />
               Urgent Security Issues
@@ -397,7 +397,7 @@ export default function UrgentIssue() {
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              <div>
+        <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Risk Level
                 </label>
@@ -407,10 +407,10 @@ export default function UrgentIssue() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">All Levels</option>
-                  {riskOptions.map(risk => <option key={risk} value={risk}>{risk}</option>)}
-                </select>
-              </div>
-              <div>
+            {riskOptions.map(risk => <option key={risk} value={risk}>{risk}</option>)}
+          </select>
+        </div>
+        <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   User Identity
                 </label>
@@ -422,7 +422,7 @@ export default function UrgentIssue() {
                   <option value="">All Users</option>
                   {userOptions.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
-              </div>
+      </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Event Name
@@ -482,7 +482,7 @@ export default function UrgentIssue() {
             
             {/* Logs Table */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
                 <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
@@ -507,8 +507,8 @@ export default function UrgentIssue() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
-                    </tr>
-                  </thead>
+                  </tr>
+                </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {sortedLogs.map((log) => (
                       <React.Fragment key={log._id}>
@@ -588,14 +588,14 @@ export default function UrgentIssue() {
                                 )}
                               </div>
                             </td>
-                          </tr>
+                    </tr>
                         )}
                       </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          </div>
           </>
         )}
       </div>
