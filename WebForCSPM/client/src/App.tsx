@@ -19,6 +19,7 @@ import AuthNav from "./components/AuthNav";
 import Model from "./pages/Model";
 import UrgentIssue from "./pages/UrgentIssue";
 import Analytics from "./pages/Analytics";
+import Info from "./pages/Info";
 import "./App.css";
 
 const queryClient = new QueryClient();
@@ -161,6 +162,14 @@ function App() {
                 element={
                   <PrivateRoute>
                     <Analytics />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/info"
+                element={
+                  <PrivateRoute>
+                    <Info />
                   </PrivateRoute>
                 }
               />

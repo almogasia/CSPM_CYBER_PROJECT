@@ -12,6 +12,7 @@ import {
   UserGroupIcon,
   ExclamationTriangleIcon,
   ChartBarIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "./Logo";
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Analytics", href: "/analytics", icon: ChartBarIcon },
   { name: "Users", href: "/users", icon: UserGroupIcon },
   { name: "Model", href: "/model", icon: ClipboardDocumentListIcon },
+  { name: "Info", href: "/info", icon: InformationCircleIcon },
   {
     name: "Coming Soon...",
     icon: CloudArrowUpIcon,
