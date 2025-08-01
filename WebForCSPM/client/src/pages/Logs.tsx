@@ -41,6 +41,25 @@ interface Log {
   anomaly_detected: boolean;
   rule_based_flags: number;
   timestamp: string;
+  // The 18 features from pipe-separated input
+  eventID?: string;
+  eventTime?: string;
+  sourceIPAddress?: string;
+  userAgent?: string;
+  eventName?: string;
+  eventSource?: string;
+  awsRegion?: string;
+  eventVersion?: string;
+  userIdentitytype?: string;
+  eventType?: string;
+  userIdentityaccountId?: string;
+  userIdentityprincipalId?: string;
+  userIdentityarn?: string;
+  userIdentityaccessKeyId?: string;
+  userIdentityuserName?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  requestParametersinstanceType?: string;
 }
 
 interface LogStats {
@@ -91,6 +110,7 @@ export default function Logs() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingInterval, setProcessingInterval] = useState<number | null>(null);
   const [uniqueEventNames, setUniqueEventNames] = useState<string[]>([]);
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
 
   const fetchLogs = async () => {
     try {
@@ -350,6 +370,18 @@ export default function Logs() {
       }
       return value !== undefined;
     }).length;
+  };
+
+  const toggleLogExpansion = (logId: string) => {
+    setExpandedLogs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(logId)) {
+        newSet.delete(logId);
+      } else {
+        newSet.add(logId);
+      }
+      return newSet;
+    });
   };
 
   const SortButton = ({
@@ -762,39 +794,142 @@ export default function Logs() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     <SortButton field="risk_score" label="Risk Score" />
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Details
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {sortedLogs.map((log) => (
-                  <tr
-                    key={log._id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getRiskLevelColor(
-                          log.risk_level
-                        )}`}
-                      >
-                        {log.risk_level}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                      {log.event_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {log.user_identity_type}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {log.source_ip}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {log.risk_score}
-                    </td>
-                  </tr>
+                  <React.Fragment key={log._id}>
+                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getRiskLevelColor(
+                            log.risk_level
+                          )}`}
+                        >
+                          {log.risk_level}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        {log.event_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {log.user_identity_type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {log.source_ip}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {log.risk_score}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => toggleLogExpansion(log._id)}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-xs font-medium rounded text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                        >
+                          {expandedLogs.has(log._id) ? 'Collapse' : 'Expand'}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedLogs.has(log._id) && (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50">
+                          <div className="space-y-4">
+                            <h4 className="text-sm font-medium text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+                              Raw Log Data (18 Features)
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">1. Event ID:</span>
+                                  <span className="text-gray-900 dark:text-white font-mono text-xs break-all">{log.eventID || log.event_id || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">2. Event Time:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.eventTime || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">3. Source IP Address:</span>
+                                  <span className="text-gray-900 dark:text-white font-mono text-xs">{log.sourceIPAddress || log.source_ip || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">4. User Agent:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs break-all">{log.userAgent || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">5. Event Name:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.eventName || log.event_name || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">6. Event Source:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.eventSource || 'N/A'}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">7. AWS Region:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.awsRegion || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">8. Event Version:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.eventVersion || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">9. User Identity Type:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.userIdentitytype || log.user_identity_type || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">10. Event Type:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.eventType || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">11. Account ID:</span>
+                                  <span className="text-gray-900 dark:text-white font-mono text-xs">{log.userIdentityaccountId || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">12. Principal ID:</span>
+                                  <span className="text-gray-900 dark:text-white font-mono text-xs break-all">{log.userIdentityprincipalId || 'N/A'}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">13. User ARN:</span>
+                                  <span className="text-gray-900 dark:text-white font-mono text-xs break-all">{log.userIdentityarn || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">14. Access Key ID:</span>
+                                  <span className="text-gray-900 dark:text-white font-mono text-xs break-all">{log.userIdentityaccessKeyId || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">15. Username:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.userIdentityuserName || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">16. Error Code:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.errorCode || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">17. Error Message:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs break-all">{log.errorMessage || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 font-medium">18. Instance Type:</span>
+                                  <span className="text-gray-900 dark:text-white text-xs">{log.requestParametersinstanceType || 'N/A'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

@@ -20,7 +20,7 @@ stats_collection = db.stats
 class LogEntry:
     def __init__(self, event_id, event_name, user_identity_type, source_ip, 
                  risk_score, risk_level, model_loaded, anomaly_detected, 
-                 rule_based_flags, timestamp=None):
+                 rule_based_flags, timestamp=None, **kwargs):
         self.event_id = event_id
         self.event_name = event_name
         self.user_identity_type = user_identity_type
@@ -31,6 +31,25 @@ class LogEntry:
         self.anomaly_detected = anomaly_detected
         self.rule_based_flags = rule_based_flags
         self.timestamp = timestamp or datetime.utcnow()
+        
+        # Store all 18 features from the original log
+        self.eventID = kwargs.get('eventID')
+        self.eventTime = kwargs.get('eventTime')
+        self.sourceIPAddress = kwargs.get('sourceIPAddress')
+        self.userAgent = kwargs.get('userAgent')
+        self.eventSource = kwargs.get('eventSource')
+        self.awsRegion = kwargs.get('awsRegion')
+        self.eventVersion = kwargs.get('eventVersion')
+        self.userIdentitytype = kwargs.get('userIdentitytype')
+        self.eventType = kwargs.get('eventType')
+        self.userIdentityaccountId = kwargs.get('userIdentityaccountId')
+        self.userIdentityprincipalId = kwargs.get('userIdentityprincipalId')
+        self.userIdentityarn = kwargs.get('userIdentityarn')
+        self.userIdentityaccessKeyId = kwargs.get('userIdentityaccessKeyId')
+        self.userIdentityuserName = kwargs.get('userIdentityuserName')
+        self.errorCode = kwargs.get('errorCode')
+        self.errorMessage = kwargs.get('errorMessage')
+        self.requestParametersinstanceType = kwargs.get('requestParametersinstanceType')
     
     def to_dict(self):
         return {
@@ -43,7 +62,25 @@ class LogEntry:
             'model_loaded': self.model_loaded,
             'anomaly_detected': self.anomaly_detected,
             'rule_based_flags': self.rule_based_flags,
-            'timestamp': self.timestamp
+            'timestamp': self.timestamp,
+            # All 18 features from the original log
+            'eventID': self.eventID,
+            'eventTime': self.eventTime,
+            'sourceIPAddress': self.sourceIPAddress,
+            'userAgent': self.userAgent,
+            'eventSource': self.eventSource,
+            'awsRegion': self.awsRegion,
+            'eventVersion': self.eventVersion,
+            'userIdentitytype': self.userIdentitytype,
+            'eventType': self.eventType,
+            'userIdentityaccountId': self.userIdentityaccountId,
+            'userIdentityprincipalId': self.userIdentityprincipalId,
+            'userIdentityarn': self.userIdentityarn,
+            'userIdentityaccessKeyId': self.userIdentityaccessKeyId,
+            'userIdentityuserName': self.userIdentityuserName,
+            'errorCode': self.errorCode,
+            'errorMessage': self.errorMessage,
+            'requestParametersinstanceType': self.requestParametersinstanceType
         }
     
     @staticmethod

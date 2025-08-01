@@ -127,7 +127,26 @@ def process_random_log():
             model_loaded=True,  # Models are always loaded in new system
             anomaly_detected=result['model_predictions']['anomaly_detected'],
             rule_based_flags=len(result['risk_reasons']),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            # Pass all 18 features
+            eventID=input_features['eventID'],
+            eventTime=input_features['eventTime'],
+            sourceIPAddress=input_features['sourceIPAddress'],
+            userAgent=input_features['userAgent'],
+            eventName=input_features['eventName'],
+            eventSource=input_features['eventSource'],
+            awsRegion=input_features['awsRegion'],
+            eventVersion=input_features['eventVersion'],
+            userIdentitytype=input_features['userIdentitytype'],
+            eventType=input_features['eventType'],
+            userIdentityaccountId=input_features['userIdentityaccountId'],
+            userIdentityprincipalId=input_features['userIdentityprincipalId'],
+            userIdentityarn=input_features['userIdentityarn'],
+            userIdentityaccessKeyId=input_features['userIdentityaccessKeyId'],
+            userIdentityuserName=input_features['userIdentityuserName'],
+            errorCode=input_features['errorCode'],
+            errorMessage=input_features['errorMessage'],
+            requestParametersinstanceType=input_features['requestParametersinstanceType']
         )
         
         LogManager.add_log(log_entry)
@@ -183,7 +202,26 @@ def model_evaluate():
             model_loaded=True,  # Models are always loaded in new system
             anomaly_detected=result['model_predictions']['anomaly_detected'],
             rule_based_flags=len(result['risk_reasons']),
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
+            # Pass all 18 features
+            eventID=input_features['eventID'],
+            eventTime=input_features['eventTime'],
+            sourceIPAddress=input_features['sourceIPAddress'],
+            userAgent=input_features['userAgent'],
+            eventName=input_features['eventName'],
+            eventSource=input_features['eventSource'],
+            awsRegion=input_features['awsRegion'],
+            eventVersion=input_features['eventVersion'],
+            userIdentitytype=input_features['userIdentitytype'],
+            eventType=input_features['eventType'],
+            userIdentityaccountId=input_features['userIdentityaccountId'],
+            userIdentityprincipalId=input_features['userIdentityprincipalId'],
+            userIdentityarn=input_features['userIdentityarn'],
+            userIdentityaccessKeyId=input_features['userIdentityaccessKeyId'],
+            userIdentityuserName=input_features['userIdentityuserName'],
+            errorCode=input_features['errorCode'],
+            errorMessage=input_features['errorMessage'],
+            requestParametersinstanceType=input_features['requestParametersinstanceType']
         )
         
         LogManager.add_log(log_entry)
