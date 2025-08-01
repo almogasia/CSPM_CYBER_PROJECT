@@ -103,39 +103,29 @@ def process_random_log():
         if not lines:
             return jsonify({'error': 'No logs found in aws_logs.txt'}), 400
         
-        # Select a random line
+        # Select a random line - the model will handle parsing
         random_line = random.choice(lines).strip()
-        
-        # Parse the log line - it should already be in pipe-separated format
-        parts = random_line.split('|')
-        if len(parts) < 18:
-            return jsonify({'error': 'Invalid log format'}), 400
-        
-        # Take first 18 parts and join them back into pipe-separated format
-        log_data = '|'.join(parts[:18])
         
         # Initialize the multi-model CSPM system
         cspm = MultiModelCSPM()
         
-        # Evaluate the log
-        result = cspm.evaluate_log(log_data)
+        # Evaluate the log - model handles all parsing internally
+        result = cspm.evaluate_log(random_line)
         
         if not result['success']:
             return jsonify({'error': result['error']}), 400
         
-        # Extract features for additional context
-        features = log_data.split('|')
-        
-        # Save log to MongoDB
+        # Save log to MongoDB using the parsed features from the model
+        input_features = result['input_features']
         log_entry = LogEntry(
-            event_id=features[0],
-            event_name=features[4],
-            user_identity_type=features[8],
-            source_ip=features[2],
+            event_id=input_features['eventID'],
+            event_name=input_features['eventName'],
+            user_identity_type=input_features['userIdentitytype'],
+            source_ip=input_features['sourceIPAddress'],
             risk_score=result['risk_score'],
             risk_level=result['risk_level'],
             model_loaded=True,  # Models are always loaded in new system
-            anomaly_detected=result['model_predictions']['isolation_anomaly'],
+            anomaly_detected=result['model_predictions']['anomaly_detected'],
             rule_based_flags=len(result['risk_reasons']),
             timestamp=datetime.now()
         )
@@ -144,13 +134,6 @@ def process_random_log():
         
         # Add the original log data to the result
         result['original_log'] = random_line
-        result['parsed_features'] = {
-            'eventID': features[0],
-            'eventName': features[4],
-            'userIdentitytype': features[8],
-            'sourceIPAddress': features[2],
-            'errorCode': features[15] if len(features) > 15 else 'NoError'
-            }
         
         return jsonify(result)
         
@@ -167,7 +150,7 @@ def model_evaluate():
     
     data = request.json
     
-    # Handle both old format (list) and new format (pipe-separated string)
+    # Handle both string format (pipe-separated) and list format
     if isinstance(data, list):
         if len(data) != 18:
             return jsonify({'error': 'Input must be a list of 18 features'}), 400
@@ -182,25 +165,23 @@ def model_evaluate():
         # Initialize the multi-model CSPM system
         cspm = MultiModelCSPM()
         
-        # Evaluate the log
+        # Evaluate the log - model handles all parsing internally
         result = cspm.evaluate_log(log_data)
         
         if not result['success']:
             return jsonify({'error': result['error']}), 400
         
-        # Extract features for logging
-        features = log_data.split('|')
-        
-        # Save log to MongoDB
+        # Save log to MongoDB using the parsed features from the model
+        input_features = result['input_features']
         log_entry = LogEntry(
-            event_id=features[0],
-            event_name=features[4],
-            user_identity_type=features[8],
-            source_ip=features[2],
+            event_id=input_features['eventID'],
+            event_name=input_features['eventName'],
+            user_identity_type=input_features['userIdentitytype'],
+            source_ip=input_features['sourceIPAddress'],
             risk_score=result['risk_score'],
             risk_level=result['risk_level'],
             model_loaded=True,  # Models are always loaded in new system
-            anomaly_detected=result['model_predictions']['isolation_anomaly'],
+            anomaly_detected=result['model_predictions']['anomaly_detected'],
             rule_based_flags=len(result['risk_reasons']),
             timestamp=datetime.now()
         )
@@ -217,7 +198,7 @@ def model_evaluate():
             'risk_score': result['risk_score'],
             'risk_level': result['risk_level'],
             'model_loaded': True,  # Models are always loaded in new system
-            'model_anomaly_detected': result['model_predictions']['isolation_anomaly'],
+            'model_anomaly_detected': result['model_predictions']['anomaly_detected'],
             'rule_based_flags': len(result['risk_reasons']),
             'calculation_breakdown': {
                 'risk_score': result['risk_score'],
