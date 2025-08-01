@@ -108,6 +108,7 @@ class LogManager:
         try:
             # Get user_id from the log entry
             user_id = log_entry.user_id
+            print(f"Adding log for user: {user_id}")  # Debug log
             
             # Insert the new log
             logs_collection.insert_one(log_entry.to_dict())
@@ -116,14 +117,28 @@ class LogManager:
             from pymongo import UpdateOne
             from bson import ObjectId
             
+            # First, ensure the user has a log_count field
+            user = db.users.find_one({'_id': ObjectId(user_id)})
+            if user and 'log_count' not in user:
+                print(f"Initializing log_count for user {user_id}")  # Debug log
+                # Initialize log_count to current log count
+                current_count = logs_collection.count_documents({'user_id': user_id})
+                db.users.update_one(
+                    {'_id': ObjectId(user_id)},
+                    {'$set': {'log_count': current_count}}
+                )
+            
             # Increment the log count and get the new value atomically
-            result = users_collection.find_one_and_update(
+            result = db.users.find_one_and_update(
                 {'_id': ObjectId(user_id)},
                 {'$inc': {'log_count': 1}},
                 return_document=True
             )
             
+            print(f"Updated log count for user {user_id}: {result.get('log_count', 0) if result else 'No result'}")  # Debug log
+            
             if result and result.get('log_count', 0) > 100:
+                print(f"User {user_id} has {result.get('log_count', 0)} logs, cleaning up...")  # Debug log
                 # We're over the limit, do cleanup
                 newest_100 = list(logs_collection.find({'user_id': user_id}).sort('timestamp', -1).limit(100))
                 if newest_100:
@@ -134,11 +149,14 @@ class LogManager:
                         'timestamp': {'$lt': cutoff_timestamp}
                     }).deleted_count
                     
+                    print(f"Deleted {deleted_count} old logs for user {user_id}")  # Debug log
+                    
                     # Reset the log count to 100
-                    users_collection.update_one(
+                    db.users.update_one(
                         {'_id': ObjectId(user_id)},
                         {'$set': {'log_count': 100}}
                     )
+                    print(f"Reset log count to 100 for user {user_id}")  # Debug log
             
             return True
         except Exception as e:
