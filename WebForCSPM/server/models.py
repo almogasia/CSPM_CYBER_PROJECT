@@ -287,6 +287,68 @@ class LogManager:
             print(f"Error getting recent activity: {e}")
             return []
 
+    @staticmethod
+    def get_urgent_issue_groups(time_window_minutes=10, min_group_size=3):
+        """Group logs by user_identity_type, source_ip, and time window. Return groups with >= min_group_size logs."""
+        try:
+            from datetime import datetime, timedelta
+            from bson import ObjectId
+            # Fetch all logs sorted by timestamp ascending
+            logs = list(logs_collection.find().sort('timestamp', 1))
+            groups = []
+            used = set()
+            for i, log in enumerate(logs):
+                if i in used:
+                    continue
+                group = [log]
+                used.add(i)
+                t0 = log.get('timestamp')
+                user = log.get('user_identity_type')
+                ip = log.get('source_ip')
+                # Group logs within the time window, same user and IP
+                for j in range(i+1, len(logs)):
+                    other = logs[j]
+                    if j in used:
+                        continue
+                    if (other.get('user_identity_type') == user and
+                        other.get('source_ip') == ip and
+                        abs((other.get('timestamp') - t0).total_seconds()) <= time_window_minutes * 60):
+                        group.append(other)
+                        used.add(j)
+                
+                if len(group) >= min_group_size:
+                    # Determine the main reason for grouping
+                    time_span = (group[-1].get('timestamp') - group[0].get('timestamp')).total_seconds() / 60
+                    unique_users = len(set(g.get('user_identity_type') for g in group))
+                    unique_ips = len(set(g.get('source_ip') for g in group))
+                    
+                    if time_span <= 2:  # Very short time span
+                        main_reason = f"Rapid activity within {time_span:.1f} minutes"
+                    elif unique_users == 1 and unique_ips == 1:
+                        main_reason = f"Same user ({user}) from same IP ({ip}) over {time_span:.1f} minutes"
+                    elif unique_users == 1:
+                        main_reason = f"Same user ({user}) from multiple IPs over {time_span:.1f} minutes"
+                    elif unique_ips == 1:
+                        main_reason = f"Multiple users from same IP ({ip}) over {time_span:.1f} minutes"
+                    else:
+                        main_reason = f"Activity cluster over {time_span:.1f} minutes"
+                    
+                    groups.append({
+                        'user_identity_type': user,
+                        'source_ip': ip,
+                        'start_time': group[0].get('timestamp').isoformat() if group else None,
+                        'end_time': group[-1].get('timestamp').isoformat() if group else None,
+                        'main_reason': main_reason,
+                        'logs': [
+                            {k: (str(v) if k == '_id' and isinstance(v, ObjectId) else (v.isoformat() if k == 'timestamp' and hasattr(v, 'isoformat') else v)) for k, v in g.items()}
+                            for g in group
+                        ]
+                    })
+            return groups
+        except Exception as e:
+            print(f"Error grouping urgent issues: {e}")
+            return []
+
 # User model for authentication
 class User:
     def __init__(self, name, email, password=None, _id=None):

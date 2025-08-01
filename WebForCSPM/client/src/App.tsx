@@ -17,6 +17,8 @@ import Register from "./pages/Register";
 import PrivateRoute from "./components/PrivateRoute";
 import AuthNav from "./components/AuthNav";
 import Model from "./pages/Model";
+import UrgentIssue from "./pages/UrgentIssue";
+import Analytics from "./pages/Analytics";
 import "./App.css";
 
 const queryClient = new QueryClient();
@@ -143,6 +145,22 @@ function App() {
                 element={
                   <PrivateRoute>
                     <Model />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/urgent-issues"
+                element={
+                  <PrivateRoute>
+                    <UrgentIssue />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <PrivateRoute>
+                    <Analytics />
                   </PrivateRoute>
                 }
               />
