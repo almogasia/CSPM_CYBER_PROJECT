@@ -36,7 +36,7 @@ interface Log {
   user_identity_type: string;
   source_ip: string;
   risk_score: number;
-  risk_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  risk_level: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "SAFE";
   model_loaded: boolean;
   anomaly_detected: boolean;
   rule_based_flags: number;
@@ -259,6 +259,8 @@ export default function Logs() {
       case "MEDIUM":
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400";
       case "LOW":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
+      case "SAFE":
         return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
@@ -268,12 +270,14 @@ export default function Logs() {
   const getRiskLevelOrder = (riskLevel: Log["risk_level"]) => {
     switch (riskLevel) {
       case "CRITICAL":
-        return 4;
+        return 5;
       case "HIGH":
-        return 3;
+        return 4;
       case "MEDIUM":
-        return 2;
+        return 3;
       case "LOW":
+        return 2;
+      case "SAFE":
         return 1;
       default:
         return 0;
@@ -599,6 +603,7 @@ export default function Logs() {
                         <option value="HIGH">High</option>
                         <option value="MEDIUM">Medium</option>
                         <option value="LOW">Low</option>
+                        <option value="SAFE">Safe</option>
                       </select>
                     </div>
 

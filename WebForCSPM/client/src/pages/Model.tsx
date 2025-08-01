@@ -59,6 +59,11 @@ export default function Model() {
           {/* Risk Level Highlight Box */}
           {result.risk_assessment && (
             <div className="mb-4 p-4 rounded-lg border-2 font-bold text-center text-lg">
+              {result.risk_assessment.risk_level === 'CRITICAL' && (
+                <div className="bg-red-900 border-red-600 text-red-100 dark:bg-red-800 dark:border-red-500 dark:text-red-200">
+                  🚨 CRITICAL RISK - {result.risk_assessment.risk_score}/100
+                </div>
+              )}
               {result.risk_assessment.risk_level === 'HIGH' && (
                 <div className="bg-red-100 border-red-500 text-red-800 dark:bg-red-900 dark:border-red-400 dark:text-red-200">
                   ⚠️ HIGH RISK - {result.risk_assessment.risk_score}/100
@@ -70,8 +75,13 @@ export default function Model() {
                 </div>
               )}
               {result.risk_assessment.risk_level === 'LOW' && (
+                <div className="bg-blue-100 border-blue-500 text-blue-800 dark:bg-blue-900 dark:border-blue-400 dark:text-blue-200">
+                  🔵 LOW RISK - {result.risk_assessment.risk_score}/100
+                </div>
+              )}
+              {result.risk_assessment.risk_level === 'SAFE' && (
                 <div className="bg-green-100 border-green-500 text-green-800 dark:bg-green-900 dark:border-green-400 dark:text-green-200">
-                  ✅ LOW RISK - {result.risk_assessment.risk_score}/100
+                  ✅ SAFE - {result.risk_assessment.risk_score}/100
                 </div>
               )}
             </div>

@@ -179,14 +179,16 @@ class MultiModelCSPM:
             risk_score = score_log_string(log_string)
             
             # Determine risk level based on score
-            if risk_score >= 90:
+            if risk_score >= 80:
                 risk_level = "CRITICAL"
-            elif risk_score >= 70:
+            elif risk_score >= 60:
                 risk_level = "HIGH"
             elif risk_score >= 40:
                 risk_level = "MEDIUM"
-            else:
+            elif risk_score >= 20:
                 risk_level = "LOW"
+            else:
+                risk_level = "SAFE"
             
             # Parse the log to get features for storage
             input_features = parse_log_string(log_string)
