@@ -405,11 +405,11 @@ export default function Logs() {
     </button>
   );
 
-  // Create log types from stats
+  // Create log types from stats with more logical mappings
   const logTypes: LogType[] = [
     {
       id: "critical",
-      name: "Critical Events",
+      name: "Critical Risk",
       count: stats?.critical_risk_count || 0,
       icon: ExclamationTriangleIcon,
       color: "from-red-800 to-red-900",
@@ -417,8 +417,8 @@ export default function Logs() {
       change: 0,
     },
     {
-      id: "security",
-      name: "Security Events",
+      id: "high",
+      name: "High Risk",
       count: stats?.high_risk_count || 0,
       icon: ShieldCheckIcon,
       color: "from-red-500 to-red-600",
@@ -426,8 +426,8 @@ export default function Logs() {
       change: trends?.high_risk_change ? Math.abs(trends.high_risk_change) : 0,
     },
     {
-      id: "compliance",
-      name: "Compliance Violations",
+      id: "medium",
+      name: "Medium Risk",
       count: stats?.medium_risk_count || 0,
       icon: DocumentTextIcon,
       color: "from-yellow-500 to-yellow-600",
@@ -435,8 +435,8 @@ export default function Logs() {
       change: trends?.medium_risk_change ? Math.abs(trends.medium_risk_change) : 0,
     },
     {
-      id: "audit",
-      name: "Audit Logs",
+      id: "total",
+      name: "Total Logs",
       count: stats?.total_logs || 0,
       icon: ChartBarIcon,
       color: "from-blue-500 to-blue-600",
@@ -444,8 +444,8 @@ export default function Logs() {
       change: trends?.total_change ? Math.abs(trends.total_change) : 0,
     },
     {
-      id: "system",
-      name: "System Events",
+      id: "anomalies",
+      name: "Anomalies",
       count: stats?.anomaly_count || 0,
       icon: ServerIcon,
       color: "from-green-500 to-green-600",
@@ -525,7 +525,7 @@ export default function Logs() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {logTypes.map((type) => (
             <div
               key={type.id}

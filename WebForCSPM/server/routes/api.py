@@ -583,3 +583,119 @@ def deploy_file():
         return protected_route()
     except Exception as e:
         return jsonify({'error': f'Deployment failed: {str(e)}'}), 500
+
+@api_bp.route('/assessments/recent', methods=['GET'])
+def get_recent_assessments():
+    """Get recent assessments based on log data"""
+    try:
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Get user's log stats to create assessments
+            stats = LogManager.get_stats(user_id=user_id)
+            
+            # Create assessments based on real data
+            assessments = []
+            
+            if stats and stats.get('total_logs', 0) > 0:
+                # Calculate security score based on risk distribution
+                total_logs = stats.get('total_logs', 0)
+                critical_count = stats.get('critical_risk_count', 0)
+                high_count = stats.get('high_risk_count', 0)
+                medium_count = stats.get('medium_risk_count', 0)
+                anomaly_count = stats.get('anomaly_count', 0)
+                root_count = stats.get('root_user_count', 0)
+                
+                # Security score calculation (higher is better)
+                risk_penalty = (critical_count * 20) + (high_count * 10) + (medium_count * 5) + (anomaly_count * 3) + (root_count * 5)
+                max_possible_penalty = total_logs * 20
+                security_score = max(0, 100 - (risk_penalty / max_possible_penalty * 100)) if max_possible_penalty > 0 else 100
+                
+                # Infrastructure Security Assessment
+                assessments.append({
+                    'id': '1',
+                    'name': 'Infrastructure Security Assessment',
+                    'type': 'Infrastructure Security',
+                    'status': 'completed',
+                    'score': round(security_score, 1),
+                    'date': datetime.utcnow().isoformat(),
+                    'findings': {
+                        'high': critical_count + high_count,
+                        'medium': medium_count,
+                        'low': total_logs - (critical_count + high_count + medium_count)
+                    }
+                })
+                
+                # Data Security Assessment
+                data_security_score = max(0, 100 - (anomaly_count * 5))
+                assessments.append({
+                    'id': '2',
+                    'name': 'Data Security Assessment',
+                    'type': 'Data Security',
+                    'status': 'completed',
+                    'score': round(data_security_score, 1),
+                    'date': (datetime.utcnow() - timedelta(hours=2)).isoformat(),
+                    'findings': {
+                        'high': anomaly_count,
+                        'medium': root_count,
+                        'low': max(0, total_logs - anomaly_count - root_count)
+                    }
+                })
+                
+                # Compliance Assessment
+                compliance_score = max(0, 100 - (critical_count * 15) - (high_count * 8))
+                assessments.append({
+                    'id': '3',
+                    'name': 'Compliance Assessment',
+                    'type': 'Compliance Check',
+                    'status': 'completed',
+                    'score': round(compliance_score, 1),
+                    'date': (datetime.utcnow() - timedelta(hours=4)).isoformat(),
+                    'findings': {
+                        'high': critical_count,
+                        'medium': high_count,
+                        'low': medium_count
+                    }
+                })
+            
+            return jsonify({
+                'success': True,
+                'assessments': assessments
+            })
+        
+        return protected_route()
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch assessments: {str(e)}'}), 500
+
+@api_bp.route('/assessments/start', methods=['POST'])
+def start_assessment():
+    """Start a new assessment"""
+    try:
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Get assessment parameters
+            data = request.json
+            provider = data.get('provider', 'Unknown')
+            assessment_type = data.get('type', 'General')
+            scope = data.get('scope', 'default-scope')
+            
+            # For now, return a success response
+            # In a real implementation, this would start an actual assessment process
+            return jsonify({
+                'success': True,
+                'message': f'Assessment started for {provider} - {assessment_type}',
+                'assessment_id': f'assessment_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}'
+            })
+        
+        return protected_route()
+    except Exception as e:
+        return jsonify({'error': f'Failed to start assessment: {str(e)}'}), 500

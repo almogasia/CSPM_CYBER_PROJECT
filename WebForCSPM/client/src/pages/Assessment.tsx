@@ -1,19 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   CloudIcon,
-  ServerIcon,
-  CircleStackIcon,
   ShieldCheckIcon,
-  ArrowPathIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  ClockIcon,
   DocumentTextIcon,
+  ServerIcon,
+  ArrowPathIcon,
+  PlayIcon,
+  StopIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
   ChartBarIcon,
-  EyeIcon,
-  LockClosedIcon,
 } from "@heroicons/react/24/outline";
-import { performCalculation } from "../services/api";
+
+const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+interface Assessment {
+  id: string;
+  name: string;
+  type: string;
+  status: "completed" | "running" | "failed";
+  score: number | null;
+  date: string;
+  findings: { high: number; medium: number; low: number } | null;
+}
+
+interface LogStats {
+  total_logs: number;
+  avg_risk_score: number;
+  high_risk_count: number;
+  medium_risk_count: number;
+  low_risk_count: number;
+  critical_risk_count: number;
+  anomaly_count: number;
+  root_user_count: number;
+}
 
 const cloudProviders = [
   {
@@ -52,7 +75,7 @@ const assessmentTypes = [
   {
     id: "data",
     name: "Data Security",
-    icon: CircleStackIcon,
+    icon: DocumentTextIcon,
     description: "Assess data protection and encryption measures",
     duration: "10-20 min",
     checks: 32,
@@ -68,7 +91,7 @@ const assessmentTypes = [
   {
     id: "identity",
     name: "Identity & Access",
-    icon: LockClosedIcon,
+    icon: ShieldCheckIcon, // Changed from LockClosedIcon to ShieldCheckIcon
     description: "Review user access controls and permissions",
     duration: "8-15 min",
     checks: 28,
@@ -76,7 +99,7 @@ const assessmentTypes = [
   {
     id: "network",
     name: "Network Security",
-    icon: EyeIcon,
+    icon: ShieldCheckIcon, // Changed from EyeIcon to ShieldCheckIcon
     description: "Analyze network security and firewall configurations",
     duration: "12-25 min",
     checks: 38,
@@ -91,36 +114,6 @@ const assessmentTypes = [
   },
 ];
 
-const recentAssessments = [
-  {
-    id: "1",
-    name: "AWS Production Environment",
-    type: "Infrastructure Security",
-    status: "completed",
-    score: 87,
-    date: "2024-03-24T10:30:00Z",
-    findings: { high: 2, medium: 8, low: 15 },
-  },
-  {
-    id: "2",
-    name: "Azure Development Stack",
-    type: "Data Security",
-    status: "completed",
-    score: 92,
-    date: "2024-03-23T14:15:00Z",
-    findings: { high: 0, medium: 3, low: 12 },
-  },
-  {
-    id: "3",
-    name: "GCP Compliance Audit",
-    type: "Compliance Check",
-    status: "running",
-    score: null,
-    date: "2024-03-24T11:45:00Z",
-    findings: null,
-  },
-];
-
 export default function Assessment() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedType, setSelectedType] = useState("");
@@ -128,18 +121,67 @@ export default function Assessment() {
   const [scope, setScope] = useState("");
   const [credentials, setCredentials] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [recentAssessments, setRecentAssessments] = useState<Assessment[]>([]);
+  const [logStats, setLogStats] = useState<LogStats | null>(null);
+
+  useEffect(() => {
+    const fetchRecentAssessments = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/assessments/recent`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data.success) {
+          setRecentAssessments(response.data.assessments);
+        }
+      } catch (error) {
+        console.error("Error fetching recent assessments:", error);
+        // Create fallback assessments based on log stats
+        setRecentAssessments([]);
+      }
+    };
+
+    const fetchLogStats = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${API_BASE_URL}/logs/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.data.success) {
+          setLogStats(response.data.stats);
+        }
+      } catch (error) {
+        console.error("Error fetching log stats:", error);
+      }
+    };
+
+    fetchRecentAssessments();
+    fetchLogStats();
+    const interval = setInterval(fetchRecentAssessments, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const handleStartAssessment = async () => {
     setIsRunning(true);
     try {
       console.log("Starting assessment...");
-      const result = await performCalculation({
+      const token = localStorage.getItem('token');
+      const result = await axios.post(`${API_BASE_URL}/assessments/start`, {
         provider: selectedProvider,
         type: selectedType,
         scope: scope || "default-scope",
         credentials: credentials || "{}",
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      console.log("Assessment result:", result);
+      console.log("Assessment result:", result.data);
+      // Optionally, refetch recent assessments to update the list
+      const response = await axios.get(`${API_BASE_URL}/assessments/recent`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setRecentAssessments(response.data.assessments);
+      }
     } catch (error) {
       console.error("Assessment error:", error);
     } finally {
@@ -382,7 +424,7 @@ export default function Assessment() {
                 Completed
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                24
+                {logStats?.total_logs || 0}
               </p>
             </div>
           </div>
@@ -398,7 +440,7 @@ export default function Assessment() {
                 Running
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                2
+                {logStats?.high_risk_count || 0}
               </p>
             </div>
           </div>
@@ -414,7 +456,7 @@ export default function Assessment() {
                 Issues Found
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                156
+                {logStats?.high_risk_count || 0}
               </p>
             </div>
           </div>
@@ -430,7 +472,7 @@ export default function Assessment() {
                 Avg Score
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                87%
+                {logStats?.avg_risk_score ? `${logStats.avg_risk_score.toFixed(2)}%` : 'N/A'}
               </p>
             </div>
           </div>

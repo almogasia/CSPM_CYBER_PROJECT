@@ -649,36 +649,64 @@ export default function Dashboard() {
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">
               Compliance Status
             </h2>
-            <span className="text-sm text-green-600 font-medium">85% Compliant</span>
+            <span className={`text-sm font-medium ${
+              stats && stats.total_logs > 0 ? 'text-green-600' : 'text-gray-500'
+            }`}>
+              {stats && stats.total_logs > 0 ? 'Active Monitoring' : 'No Data'}
+            </span>
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">SOC 2 Type II</span>
+                <div className={`w-3 h-3 rounded-full mr-3 ${
+                  stats && stats.critical_risk_count === 0 ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Critical Events</span>
               </div>
-              <span className="text-sm text-green-600 font-medium">✓ Compliant</span>
+              <span className={`text-sm font-medium ${
+                stats && stats.critical_risk_count === 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {stats ? stats.critical_risk_count : 0} {stats && stats.critical_risk_count === 0 ? '✓ Safe' : '⚠ Alert'}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">ISO 27001</span>
+                <div className={`w-3 h-3 rounded-full mr-3 ${
+                  stats && stats.high_risk_count === 0 ? 'bg-green-500' : 'bg-yellow-500'
+                }`}></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">High Risk Events</span>
               </div>
-              <span className="text-sm text-green-600 font-medium">✓ Compliant</span>
+              <span className={`text-sm font-medium ${
+                stats && stats.high_risk_count === 0 ? 'text-green-600' : 'text-yellow-600'
+              }`}>
+                {stats ? stats.high_risk_count : 0} {stats && stats.high_risk_count === 0 ? '✓ Safe' : '⚠ Review'}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">GDPR</span>
+                <div className={`w-3 h-3 rounded-full mr-3 ${
+                  stats && stats.anomaly_count === 0 ? 'bg-green-500' : 'bg-yellow-500'
+                }`}></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Anomalies Detected</span>
               </div>
-              <span className="text-sm text-yellow-600 font-medium">⚠ Review</span>
+              <span className={`text-sm font-medium ${
+                stats && stats.anomaly_count === 0 ? 'text-green-600' : 'text-yellow-600'
+              }`}>
+                {stats ? stats.anomaly_count : 0} {stats && stats.anomaly_count === 0 ? '✓ Normal' : '⚠ Detected'}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-                <span className="text-sm text-gray-600 dark:text-gray-400">HIPAA</span>
+                <div className={`w-3 h-3 rounded-full mr-3 ${
+                  stats && stats.root_user_count === 0 ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Root Activities</span>
               </div>
-              <span className="text-sm text-red-600 font-medium">✗ Non-compliant</span>
+              <span className={`text-sm font-medium ${
+                stats && stats.root_user_count === 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {stats ? stats.root_user_count : 0} {stats && stats.root_user_count === 0 ? '✓ None' : '⚠ Detected'}
+              </span>
             </div>
           </div>
         </div>
@@ -688,24 +716,31 @@ export default function Dashboard() {
             <h2 className="text-lg font-medium text-gray-900 dark:text-white">
               Threat Intelligence
             </h2>
-            <span className="text-sm text-blue-600 font-medium">Updated</span>
+            <span className="text-sm text-blue-600 font-medium">
+              {stats && stats.total_logs > 0 ? 'Live Data' : 'No Data'}
+            </span>
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Active Threats</span>
-              <span className="text-sm text-red-600 font-medium">12</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Total Logs</span>
+              <span className="text-sm text-blue-600 font-medium">{stats ? stats.total_logs : 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Blocked Attacks</span>
-              <span className="text-sm text-green-600 font-medium">1,247</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">High Risk Events</span>
+              <span className="text-sm text-red-600 font-medium">{stats ? stats.high_risk_count : 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Vulnerabilities</span>
-              <span className="text-sm text-yellow-600 font-medium">8</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Anomalies</span>
+              <span className="text-sm text-yellow-600 font-medium">{stats ? stats.anomaly_count : 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Security Score</span>
-              <span className="text-sm text-green-600 font-medium">92/100</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Avg Risk Score</span>
+              <span className={`text-sm font-medium ${
+                stats && stats.avg_risk_score < 50 ? 'text-green-600' :
+                stats && stats.avg_risk_score < 75 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {stats ? stats.avg_risk_score.toFixed(1) : '0.0'}/100
+              </span>
             </div>
           </div>
         </div>
@@ -731,20 +766,28 @@ export default function Dashboard() {
         </div>
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">99.9%</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Uptime</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats ? stats.total_logs : 0}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Total Logs</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">45ms</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Avg Response</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats ? stats.avg_risk_score.toFixed(1) : '0.0'}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Avg Risk Score</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">1.2K</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Requests/min</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats ? stats.anomaly_count : 0}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Anomalies</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">0.1%</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Error Rate</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              {stats ? stats.root_user_count : 0}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Root Activities</div>
           </div>
         </div>
       </div>

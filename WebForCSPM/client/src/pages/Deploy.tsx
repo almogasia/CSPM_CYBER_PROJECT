@@ -700,7 +700,7 @@ export default function Deploy() {
                   onClick={() => toggleExpanded(deployment._id)}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center shadow-sm">
                         <CloudArrowUpIcon className="h-5 w-5 text-white" />
                       </div>
@@ -858,8 +858,8 @@ export default function Deploy() {
                                     <span className="ml-2 font-medium text-gray-900 dark:text-white">
                                       {deployment.security_scan_results.vulnerabilities_found}
                                     </span>
-                                  </div>
-                                  <div>
+                </div>
+                <div>
                                     <span className="text-gray-500 dark:text-gray-400">Scan Status:</span>
                                     <span className={`ml-2 font-medium ${
                                       deployment.security_scan_results.scan_status === 'passed' ? 'text-green-600' : 'text-red-600'
@@ -933,9 +933,9 @@ export default function Deploy() {
                               <div className="p-4">
                                 <p className="text-sm text-gray-700 dark:text-gray-300">
                                   {deployment.deployment_notes}
-                                </p>
-                              </div>
-                            </div>
+                  </p>
+                </div>
+              </div>
                           )}
                           
                           {deployment.file_description && (
@@ -949,10 +949,10 @@ export default function Deploy() {
                                   {deployment.file_description}
                                 </p>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                  </div>
+                )}
+                  </div>
+                )}
                     </div>
                   </div>
                 )}
