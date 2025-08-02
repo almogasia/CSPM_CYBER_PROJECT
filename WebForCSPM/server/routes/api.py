@@ -400,7 +400,7 @@ def get_chart_data():
             }
             
             # Error Codes
-            error_codes = Counter(log.get('error_code', 'NoError') for log in user_logs if log.get('error_code') != 'NoError')
+            error_codes = Counter(log.get('errorCode', log.get('error_code', 'NoError')) for log in user_logs if log.get('errorCode') != 'NoError' and log.get('error_code') != 'NoError')
             if not error_codes:
                 error_codes = Counter(['NoError'])
             error_codes_data = {
@@ -447,7 +447,7 @@ def get_chart_data():
             # Errors Over Time
             daily_errors = defaultdict(int)
             for log in user_logs:
-                if log.get('error_code') and log.get('error_code') != 'NoError':
+                if (log.get('errorCode') and log.get('errorCode') != 'NoError') or (log.get('error_code') and log.get('error_code') != 'NoError'):
                     if 'timestamp' in log:
                         try:
                             if isinstance(log['timestamp'], str):
@@ -536,7 +536,7 @@ def get_chart_data():
             }
             
             # Top IAM Users
-            iam_users = Counter(log.get('user_identity_user_name', 'Unknown') for log in user_logs if log.get('user_identity_user_name'))
+            iam_users = Counter(log.get('userIdentityuserName', log.get('user_identity_user_name', 'Unknown')) for log in user_logs if log.get('userIdentityuserName') or log.get('user_identity_user_name'))
             top_users = iam_users.most_common(5)
             top_iam_users_data = {
                 'labels': [user[0] for user in top_users],
@@ -550,7 +550,7 @@ def get_chart_data():
             }
             
             # Region Activity
-            regions = Counter(log.get('aws_region', 'Unknown') for log in user_logs)
+            regions = Counter(log.get('awsRegion', log.get('aws_region', 'Unknown')) for log in user_logs)
             top_regions = regions.most_common(5)
             region_activity_data = {
                 'labels': [region[0] for region in top_regions],
@@ -609,7 +609,8 @@ def get_chart_data():
                 region_event_counts = []
                 for region, _ in top_regions:
                     count = sum(1 for log in user_logs 
-                              if log.get('event_name') == event_name and log.get('aws_region') == region)
+                              if log.get('event_name') == event_name and 
+                              (log.get('awsRegion') == region or log.get('aws_region') == region))
                     region_event_counts.append(count)
                 
                 event_type_per_region_data['datasets'].append({

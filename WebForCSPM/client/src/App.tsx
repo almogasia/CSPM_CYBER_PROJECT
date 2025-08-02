@@ -19,6 +19,7 @@ import AuthNav from "./components/AuthNav";
 import Model from "./pages/Model";
 import UrgentIssue from "./pages/UrgentIssue";
 import Analytics from "./pages/Analytics";
+import ThreatClustering from "./pages/ThreatClustering";
 import Info from "./pages/Info";
 import "./App.css";
 
@@ -162,6 +163,14 @@ function App() {
                 element={
                   <PrivateRoute>
                     <Analytics />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/threat-clustering"
+                element={
+                  <PrivateRoute>
+                    <ThreatClustering />
                   </PrivateRoute>
                 }
               />
