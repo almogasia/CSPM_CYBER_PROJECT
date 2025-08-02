@@ -462,12 +462,13 @@ class LogManager:
 
 # User model for authentication
 class User:
-    def __init__(self, name, email, password=None, _id=None, log_count=0):
+    def __init__(self, name, email, password=None, _id=None, log_count=0, deployment_count=0):
         self.name = name
         self.email = email.lower() if email else None
         self.password = password
         self._id = _id
         self.log_count = log_count
+        self.deployment_count = deployment_count
     
     @staticmethod
     def find_by_email(email):
@@ -479,7 +480,8 @@ class User:
                 email=user_data['email'],
                 password=user_data['password'],
                 _id=user_data['_id'],
-                log_count=user_data.get('log_count', 0)
+                log_count=user_data.get('log_count', 0),
+                deployment_count=user_data.get('deployment_count', 0)
             )
         return None
     
@@ -494,7 +496,8 @@ class User:
                 email=user_data['email'],
                 password=user_data['password'],
                 _id=user_data['_id'],
-                log_count=user_data.get('log_count', 0)
+                log_count=user_data.get('log_count', 0),
+                deployment_count=user_data.get('deployment_count', 0)
             )
         return None
     
@@ -504,7 +507,8 @@ class User:
             "name": self.name,
             "email": self.email,
             "password": self.password,
-            "log_count": self.log_count
+            "log_count": self.log_count,
+            "deployment_count": self.deployment_count
         }
         if self._id:
             # Update existing user
