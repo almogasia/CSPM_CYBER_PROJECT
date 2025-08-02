@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import LogEntry, LogManager, Deployment, DeploymentManager
 import os
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 api_bp = Blueprint('api', __name__)
 
@@ -334,6 +335,361 @@ def model_evaluate():
     except Exception as e:
         return jsonify({'error': f'Processing failed: {str(e)}'}), 400
 
+@api_bp.route('/logs/chart-data', methods=['GET'])
+def get_chart_data():
+    """Get chart data for analytics visualization"""
+    try:
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Get user's logs for chart data
+            user_logs = LogManager.get_logs(limit=1000, skip=0, user_id=user_id)
+            
+            if not user_logs:
+                # Return empty chart data if no logs
+                return jsonify({
+                    'success': True,
+                    'chartData': {
+                        'eventTypeDistribution': {'labels': [], 'datasets': [{'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 2}]},
+                        'userIdentityTypes': {'labels': [], 'datasets': [{'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 2}]},
+                        'errorCodes': {'labels': [], 'datasets': [{'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 2}]},
+                        'eventsOverTime': {'labels': [], 'datasets': [{'label': 'Total Events', 'data': [], 'borderColor': '#3B82F6', 'backgroundColor': 'rgba(59, 130, 246, 0.1)', 'tension': 0.4}]},
+                        'errorsOverTime': {'labels': [], 'datasets': [{'label': 'Errors', 'data': [], 'borderColor': '#EF4444', 'backgroundColor': 'rgba(239, 68, 68, 0.1)', 'tension': 0.4}]},
+                        'highRiskEventsTrend': {'labels': [], 'datasets': [{'label': 'High Risk Events', 'data': [], 'borderColor': '#DC2626', 'backgroundColor': 'rgba(220, 38, 38, 0.1)', 'tension': 0.4}]},
+                        'topEventNames': {'labels': [], 'datasets': [{'label': 'Event Count', 'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 1}]},
+                        'topIpSources': {'labels': [], 'datasets': [{'label': 'Request Count', 'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 1}]},
+                        'topIamUsers': {'labels': [], 'datasets': [{'label': 'Event Count', 'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 1}]},
+                        'regionActivity': {'labels': [], 'datasets': [{'label': 'Log Count', 'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 1}]},
+                        'userActivityByType': {'labels': [], 'datasets': []},
+                        'eventTypePerRegion': {'labels': [], 'datasets': []},
+                        'hourlyActivityHeatmap': {'labels': [], 'datasets': [{'label': 'Activity Level', 'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 1}]},
+                        'regionVsEventTypeHeatmap': {'labels': [], 'datasets': [{'label': 'Event Count', 'data': [], 'backgroundColor': [], 'borderColor': [], 'borderWidth': 1}]}
+                    }
+                })
+            
+            # Process real log data for charts
+            from collections import Counter, defaultdict
+            import json
+            
+            # Event Type Distribution
+            event_types = Counter(log.get('event_name', 'Unknown') for log in user_logs)
+            event_type_data = {
+                'labels': list(event_types.keys())[:6],  # Top 6
+                'datasets': [{
+                    'data': list(event_types.values())[:6],
+                    'backgroundColor': ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#6B7280'],
+                    'borderColor': ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#4B5563'],
+                    'borderWidth': 2
+                }]
+            }
+            
+            # User Identity Types
+            user_identity_types = Counter(log.get('user_identity_type', 'Unknown') for log in user_logs)
+            user_identity_data = {
+                'labels': list(user_identity_types.keys())[:5],  # Top 5
+                'datasets': [{
+                    'data': list(user_identity_types.values())[:5],
+                    'backgroundColor': ['#10B981', '#EF4444', '#3B82F6', '#F59E0B', '#6B7280'],
+                    'borderColor': ['#059669', '#DC2626', '#2563EB', '#D97706', '#4B5563'],
+                    'borderWidth': 2
+                }]
+            }
+            
+            # Error Codes
+            error_codes = Counter(log.get('error_code', 'NoError') for log in user_logs if log.get('error_code') != 'NoError')
+            if not error_codes:
+                error_codes = Counter(['NoError'])
+            error_codes_data = {
+                'labels': list(error_codes.keys())[:5],  # Top 5
+                'datasets': [{
+                    'data': list(error_codes.values())[:5],
+                    'backgroundColor': ['#10B981', '#EF4444', '#F59E0B', '#3B82F6', '#6B7280'],
+                    'borderColor': ['#059669', '#DC2626', '#D97706', '#2563EB', '#4B5563'],
+                    'borderWidth': 2
+                }]
+            }
+            
+            # Events Over Time (last 7 days)
+            daily_events = defaultdict(int)
+            for log in user_logs:
+                if 'timestamp' in log:
+                    try:
+                        if isinstance(log['timestamp'], str):
+                            date = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00')).date()
+                        else:
+                            date = log['timestamp'].date()
+                        daily_events[date] += 1
+                    except:
+                        continue
+            
+            # Fill in missing days
+            for i in range(7):
+                date = datetime.now().date() - timedelta(days=6-i)
+                if date not in daily_events:
+                    daily_events[date] = 0
+            
+            sorted_dates = sorted(daily_events.keys())
+            events_over_time_data = {
+                'labels': [date.strftime('%a') for date in sorted_dates[-7:]],
+                'datasets': [{
+                    'label': 'Total Events',
+                    'data': [daily_events[date] for date in sorted_dates[-7:]],
+                    'borderColor': '#3B82F6',
+                    'backgroundColor': 'rgba(59, 130, 246, 0.1)',
+                    'tension': 0.4
+                }]
+            }
+            
+            # Errors Over Time
+            daily_errors = defaultdict(int)
+            for log in user_logs:
+                if log.get('error_code') and log.get('error_code') != 'NoError':
+                    if 'timestamp' in log:
+                        try:
+                            if isinstance(log['timestamp'], str):
+                                date = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00')).date()
+                            else:
+                                date = log['timestamp'].date()
+                            daily_errors[date] += 1
+                        except:
+                            continue
+            
+            # Fill in missing days
+            for i in range(7):
+                date = datetime.now().date() - timedelta(days=6-i)
+                if date not in daily_errors:
+                    daily_errors[date] = 0
+            
+            sorted_error_dates = sorted(daily_errors.keys())
+            errors_over_time_data = {
+                'labels': [date.strftime('%a') for date in sorted_error_dates[-7:]],
+                'datasets': [{
+                    'label': 'Errors',
+                    'data': [daily_errors[date] for date in sorted_error_dates[-7:]],
+                    'borderColor': '#EF4444',
+                    'backgroundColor': 'rgba(239, 68, 68, 0.1)',
+                    'tension': 0.4
+                }]
+            }
+            
+            # High Risk Events Trend
+            daily_high_risk = defaultdict(int)
+            for log in user_logs:
+                if log.get('risk_level') == 'HIGH':
+                    if 'timestamp' in log:
+                        try:
+                            if isinstance(log['timestamp'], str):
+                                date = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00')).date()
+                            else:
+                                date = log['timestamp'].date()
+                            daily_high_risk[date] += 1
+                        except:
+                            continue
+            
+            # Fill in missing days
+            for i in range(7):
+                date = datetime.now().date() - timedelta(days=6-i)
+                if date not in daily_high_risk:
+                    daily_high_risk[date] = 0
+            
+            sorted_risk_dates = sorted(daily_high_risk.keys())
+            high_risk_trend_data = {
+                'labels': [date.strftime('%a') for date in sorted_risk_dates[-7:]],
+                'datasets': [{
+                    'label': 'High Risk Events',
+                    'data': [daily_high_risk[date] for date in sorted_risk_dates[-7:]],
+                    'borderColor': '#DC2626',
+                    'backgroundColor': 'rgba(220, 38, 38, 0.1)',
+                    'tension': 0.4
+                }]
+            }
+            
+            # Top Event Names (Bar Chart)
+            top_events = event_types.most_common(5)
+            top_event_names_data = {
+                'labels': [event[0] for event in top_events],
+                'datasets': [{
+                    'label': 'Event Count',
+                    'data': [event[1] for event in top_events],
+                    'backgroundColor': ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+                    'borderColor': ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED'],
+                    'borderWidth': 1
+                }]
+            }
+            
+            # Top IP Sources
+            ip_sources = Counter(log.get('source_ip', 'Unknown') for log in user_logs)
+            top_ips = ip_sources.most_common(5)
+            top_ip_sources_data = {
+                'labels': [ip[0] for ip in top_ips],
+                'datasets': [{
+                    'label': 'Request Count',
+                    'data': [ip[1] for ip in top_ips],
+                    'backgroundColor': ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+                    'borderColor': ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED'],
+                    'borderWidth': 1
+                }]
+            }
+            
+            # Top IAM Users
+            iam_users = Counter(log.get('user_identity_user_name', 'Unknown') for log in user_logs if log.get('user_identity_user_name'))
+            top_users = iam_users.most_common(5)
+            top_iam_users_data = {
+                'labels': [user[0] for user in top_users],
+                'datasets': [{
+                    'label': 'Event Count',
+                    'data': [user[1] for user in top_users],
+                    'backgroundColor': ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+                    'borderColor': ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED'],
+                    'borderWidth': 1
+                }]
+            }
+            
+            # Region Activity
+            regions = Counter(log.get('aws_region', 'Unknown') for log in user_logs)
+            top_regions = regions.most_common(5)
+            region_activity_data = {
+                'labels': [region[0] for region in top_regions],
+                'datasets': [{
+                    'label': 'Log Count',
+                    'data': [region[1] for region in top_regions],
+                    'backgroundColor': ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+                    'borderColor': ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED'],
+                    'borderWidth': 1
+                }]
+            }
+            
+            # User Activity by Type (Stacked Area Chart)
+            user_activity_by_type_data = {
+                'labels': [date.strftime('%a') for date in sorted_dates[-7:]],
+                'datasets': []
+            }
+            
+            # Get top 3 event types for stacked chart
+            top_3_events = event_types.most_common(3)
+            colors = ['#3B82F6', '#10B981', '#F59E0B']
+            
+            for i, (event_name, _) in enumerate(top_3_events):
+                daily_event_counts = defaultdict(int)
+                for log in user_logs:
+                    if log.get('event_name') == event_name and 'timestamp' in log:
+                        try:
+                            if isinstance(log['timestamp'], str):
+                                date = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00')).date()
+                            else:
+                                date = log['timestamp'].date()
+                            daily_event_counts[date] += 1
+                        except:
+                            continue
+                
+                # Fill in missing days
+                event_data = []
+                for date in sorted_dates[-7:]:
+                    event_data.append(daily_event_counts.get(date, 0))
+                
+                user_activity_by_type_data['datasets'].append({
+                    'label': event_name,
+                    'data': event_data,
+                    'borderColor': colors[i],
+                    'backgroundColor': colors[i].replace(')', ', 0.3)').replace('rgb', 'rgba'),
+                    'fill': True
+                })
+            
+            # Event Type per Region (Stacked Area Chart)
+            event_type_per_region_data = {
+                'labels': [region[0] for region in top_regions],
+                'datasets': []
+            }
+            
+            for i, (event_name, _) in enumerate(top_3_events):
+                region_event_counts = []
+                for region, _ in top_regions:
+                    count = sum(1 for log in user_logs 
+                              if log.get('event_name') == event_name and log.get('aws_region') == region)
+                    region_event_counts.append(count)
+                
+                event_type_per_region_data['datasets'].append({
+                    'label': event_name,
+                    'data': region_event_counts,
+                    'borderColor': colors[i],
+                    'backgroundColor': colors[i].replace(')', ', 0.3)').replace('rgb', 'rgba'),
+                    'fill': True
+                })
+            
+            # Hourly Activity Heatmap
+            hourly_activity = defaultdict(int)
+            for log in user_logs:
+                if 'timestamp' in log:
+                    try:
+                        if isinstance(log['timestamp'], str):
+                            dt = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00'))
+                        else:
+                            dt = log['timestamp']
+                        hour = dt.hour
+                        hourly_activity[hour] += 1
+                    except:
+                        continue
+            
+            # Fill in missing hours
+            hourly_data = []
+            hourly_labels = []
+            for hour in range(24):
+                hourly_labels.append(f"{hour:02d}:00")
+                hourly_data.append(hourly_activity.get(hour, 0))
+            
+            hourly_activity_heatmap_data = {
+                'labels': hourly_labels[::4],  # Show every 4 hours
+                'datasets': [{
+                    'label': 'Activity Level',
+                    'data': hourly_data[::4],
+                    'backgroundColor': ['#10B981', '#34D399', '#6EE7B7', '#F59E0B', '#EF4444', '#DC2626'],
+                    'borderColor': ['#059669', '#10B981', '#34D399', '#D97706', '#DC2626', '#B91C1C'],
+                    'borderWidth': 1
+                }]
+            }
+            
+            # Region vs Event Type Heatmap
+            region_vs_event_heatmap_data = {
+                'labels': [region[0] for region in top_regions],
+                'datasets': [{
+                    'label': 'Event Count',
+                    'data': [region[1] for region in top_regions],
+                    'backgroundColor': ['#10B981', '#34D399', '#6EE7B7', '#F59E0B', '#EF4444'],
+                    'borderColor': ['#059669', '#10B981', '#34D399', '#D97706', '#DC2626'],
+                    'borderWidth': 1
+                }]
+            }
+            
+            chart_data = {
+                'eventTypeDistribution': event_type_data,
+                'userIdentityTypes': user_identity_data,
+                'errorCodes': error_codes_data,
+                'eventsOverTime': events_over_time_data,
+                'errorsOverTime': errors_over_time_data,
+                'highRiskEventsTrend': high_risk_trend_data,
+                'topEventNames': top_event_names_data,
+                'topIpSources': top_ip_sources_data,
+                'topIamUsers': top_iam_users_data,
+                'regionActivity': region_activity_data,
+                'userActivityByType': user_activity_by_type_data,
+                'eventTypePerRegion': event_type_per_region_data,
+                'hourlyActivityHeatmap': hourly_activity_heatmap_data,
+                'regionVsEventTypeHeatmap': region_vs_event_heatmap_data
+            }
+            
+            return jsonify({
+                'success': True,
+                'chartData': chart_data
+            })
+        
+        return protected_route()
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch chart data: {str(e)}'}), 500
+
 @api_bp.route('/analytics', methods=['GET'])
 def get_analytics():
     """Get analytics data for visualization and trend analysis"""
@@ -374,26 +730,132 @@ def get_analytics():
                     {'user': 'You', 'resource': 'S3', 'interactionCount': 0, 'riskScore': 0},
                 ]
             
-            # Mock analytics data - in a real implementation, this would be calculated from user's logs
+            # Generate real time heatmap data from logs
+            time_heatmap_data = []
+            if user_logs:
+                # Group logs by hour and day
+                hourly_stats = defaultdict(lambda: defaultdict(lambda: {'count': 0, 'total_risk': 0}))
+                for log in user_logs:
+                    if 'timestamp' in log:
+                        try:
+                            if isinstance(log['timestamp'], str):
+                                dt = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00'))
+                            else:
+                                dt = log['timestamp']
+                            hour = dt.hour
+                            day = dt.strftime('%a')[:3]  # Mon, Tue, etc.
+                            hourly_stats[hour][day]['count'] += 1
+                            hourly_stats[hour][day]['total_risk'] += log.get('risk_score', 0)
+                        except:
+                            continue
+                
+                # Generate heatmap data
+                days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                for hour in range(24):
+                    for day in days:
+                        stats = hourly_stats[hour][day]
+                        avg_risk = stats['total_risk'] / stats['count'] if stats['count'] > 0 else 0
+                        time_heatmap_data.append({
+                            'hour': hour,
+                            'day': day,
+                            'riskLevel': avg_risk,
+                            'activityCount': stats['count']
+                        })
+            else:
+                # Fallback heatmap data
+                for i in range(168):  # 24 hours * 7 days
+                    time_heatmap_data.append({
+                        'hour': i % 24,
+                        'day': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i // 24],
+                        'riskLevel': 0,
+                        'activityCount': 0
+                    })
+            
+            # Generate real trend analysis from logs
+            daily_trends = []
+            if user_logs:
+                # Group logs by date
+                daily_stats = defaultdict(lambda: {'total': 0, 'high_risk': 0, 'total_risk': 0})
+                for log in user_logs:
+                    if 'timestamp' in log:
+                        try:
+                            if isinstance(log['timestamp'], str):
+                                date = datetime.fromisoformat(log['timestamp'].replace('Z', '+00:00')).date()
+                            else:
+                                date = log['timestamp'].date()
+                            daily_stats[date]['total'] += 1
+                            daily_stats[date]['total_risk'] += log.get('risk_score', 0)
+                            if log.get('risk_level') == 'HIGH':
+                                daily_stats[date]['high_risk'] += 1
+                        except:
+                            continue
+                
+                # Generate trend data for last 30 days
+                for i in range(30):
+                    date = datetime.now().date() - timedelta(days=29-i)
+                    stats = daily_stats.get(date, {'total': 0, 'high_risk': 0, 'total_risk': 0})
+                    avg_risk = stats['total_risk'] / stats['total'] if stats['total'] > 0 else 0
+                    daily_trends.append({
+                        'date': date.strftime('%Y-%m-%d'),
+                        'totalLogs': stats['total'],
+                        'highRiskCount': stats['high_risk'],
+                        'avgRiskScore': avg_risk
+                    })
+            else:
+                # Fallback trend data
+                for i in range(30):
+                    date = datetime.now().date() - timedelta(days=29-i)
+                    daily_trends.append({
+                        'date': date.strftime('%Y-%m-%d'),
+                        'totalLogs': 0,
+                        'highRiskCount': 0,
+                        'avgRiskScore': 0
+                    })
+            
+            # Generate user activity trends
+            user_activity_trends = []
+            if user_logs:
+                # Calculate overall user activity
+                total_activity = len(user_logs)
+                avg_risk_score = sum(log.get('risk_score', 0) for log in user_logs) / len(user_logs) if user_logs else 0
+                
+                # Determine trend based on recent activity vs older activity
+                recent_logs = [log for log in user_logs if 'timestamp' in log]
+                if len(recent_logs) >= 2:
+                    # Split logs into two halves
+                    mid_point = len(recent_logs) // 2
+                    recent_activity = len(recent_logs[mid_point:])
+                    older_activity = len(recent_logs[:mid_point])
+                    
+                    if recent_activity > older_activity * 1.2:
+                        trend = 'increasing'
+                    elif recent_activity < older_activity * 0.8:
+                        trend = 'decreasing'
+                    else:
+                        trend = 'stable'
+                else:
+                    trend = 'stable'
+                
+                user_activity_trends.append({
+                    'user': 'You',
+                    'activityCount': total_activity,
+                    'riskScore': avg_risk_score,
+                    'trend': trend
+                })
+            else:
+                user_activity_trends.append({
+                    'user': 'You',
+                    'activityCount': 0,
+                    'riskScore': 0,
+                    'trend': 'stable'
+                })
+            
             analytics_data = {
                 'userResourceGraph': user_resource_data,
-                'timeHeatmap': [
-                    # Generate 168 data points (24 hours * 7 days)
-                    {'hour': i % 24, 'day': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i // 24], 
-                     'riskLevel': 50 + (i % 20), 'activityCount': 10 + (i % 30)}
-                    for i in range(168)
-                ],
+                'timeHeatmap': time_heatmap_data,
                 'trendAnalysis': {
-                    'dailyTrends': [
-                        # Generate 30 days of trend data
-                        {'date': (datetime.now() - timedelta(days=29-i)).strftime('%Y-%m-%d'),
-                         'totalLogs': 100 + (i * 3), 'highRiskCount': 5 + (i % 10), 
-                         'avgRiskScore': 30 + (i % 20)}
-                        for i in range(30)
-                    ],
-                    'userActivityTrends': [
-                        {'user': 'You', 'activityCount': len(user_logs), 'riskScore': sum(log.get('risk_score', 0) for log in user_logs) / len(user_logs) if user_logs else 0, 'trend': 'stable'},
-                    ]
+                    'dailyTrends': daily_trends,
+                    'userActivityTrends': user_activity_trends
                 }
             }
             return jsonify({'success': True, 'analytics': analytics_data})

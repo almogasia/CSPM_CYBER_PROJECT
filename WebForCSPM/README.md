@@ -145,6 +145,14 @@ npm install
 
 > ⚠️ **If you get an error:** Make sure Node.js is installed properly.
 
+### Step 3.5: Install Chart Dependencies (if needed)
+
+If you encounter any chart-related errors, install the chart dependencies explicitly:
+
+```bash
+npm install chart.js react-chartjs-2
+```
+
 ### Step 4: Start the Client
 
 ```bash
@@ -192,6 +200,14 @@ Open your web browser and go to `http://localhost:5173` to use the application!
 eventID|eventTime|sourceIPAddress|userAgent|eventName|eventSource|awsRegion|eventVersion|userIdentitytype|eventType|userIdentityaccountId|userIdentityprincipalId|userIdentityarn|userIdentityaccessKeyId|userIdentityuserName|errorCode|errorMessage|requestParametersinstanceType
 ```
 
+### Analytics Routes (`/api/`)
+
+- `GET /api/analytics` – Get analytics data for visualization
+- `GET /api/logs/chart-data` – Get chart data for analytics dashboard
+- `GET /api/logs/stats` – Get aggregated statistics from logs
+- `GET /api/logs/trends` – Get trend data for the last 24 hours
+- `GET /api/logs/recent-activity` – Get recent activity for the last 24 hours
+
 > 🔐 All protected routes require the header:  
 > `Authorization: Bearer <your_token>`
 
@@ -224,6 +240,8 @@ eventID|eventTime|sourceIPAddress|userAgent|eventName|eventSource|awsRegion|even
 - React Query
 - React Router
 - Vite
+- Chart.js (for analytics visualizations)
+- React-Chartjs-2 (React wrapper for Chart.js)
 
 ### Backend
 

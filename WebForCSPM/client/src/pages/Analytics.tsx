@@ -260,35 +260,13 @@ export default function Analytics() {
         if (analyticsResponse?.data?.success) {
           setData(analyticsResponse.data.analytics);
         } else {
-          // Fallback analytics data
+          // Empty analytics data if no real data is available
           setData({
-            userResourceGraph: [
-              { user: "admin", resource: "EC2", interactionCount: 45, riskScore: 75 },
-              { user: "developer", resource: "S3", interactionCount: 32, riskScore: 45 },
-              { user: "root", resource: "IAM", interactionCount: 12, riskScore: 90 },
-              { user: "user1", resource: "RDS", interactionCount: 28, riskScore: 60 },
-              { user: "user2", resource: "Lambda", interactionCount: 19, riskScore: 35 }
-            ],
-            timeHeatmap: Array.from({ length: 168 }, (_, i) => ({
-              hour: i % 24,
-              day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][Math.floor(i / 24)],
-              riskLevel: Math.random() * 100,
-              activityCount: Math.floor(Math.random() * 50)
-            })),
+            userResourceGraph: [],
+            timeHeatmap: [],
             trendAnalysis: {
-              dailyTrends: Array.from({ length: 30 }, (_, i) => ({
-                date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                totalLogs: Math.floor(Math.random() * 200) + 100,
-                highRiskCount: Math.floor(Math.random() * 20) + 5,
-                avgRiskScore: Math.random() * 10
-              })),
-              userActivityTrends: [
-                { user: "admin", activityCount: 156, riskScore: 75, trend: 'increasing' as const },
-                { user: "developer", activityCount: 89, riskScore: 45, trend: 'stable' as const },
-                { user: "root", activityCount: 23, riskScore: 90, trend: 'decreasing' as const },
-                { user: "user1", activityCount: 67, riskScore: 60, trend: 'increasing' as const },
-                { user: "user2", activityCount: 34, riskScore: 35, trend: 'stable' as const }
-              ]
+              dailyTrends: [],
+              userActivityTrends: []
             }
           });
         }
@@ -297,189 +275,22 @@ export default function Analytics() {
         if (chartDataResponse?.data?.success) {
           setChartData(chartDataResponse.data.chartData);
         } else {
-          // Fallback chart data if no real data is available
+          // Empty chart data if no real data is available
           setChartData({
-            eventTypeDistribution: {
-              labels: ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser", "Other"],
-              datasets: [{
-                data: [45, 25, 12, 8, 6, 4],
-                backgroundColor: [
-                  "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280"
-                ],
-                borderColor: [
-                  "#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#4B5563"
-                ],
-                borderWidth: 2
-              }]
-            },
-            userIdentityTypes: {
-              labels: ["IAMUser", "Root", "AssumedRole", "FederatedUser", "Other"],
-              datasets: [{
-                data: [60, 15, 12, 8, 5],
-                backgroundColor: [
-                  "#10B981", "#EF4444", "#3B82F6", "#F59E0B", "#6B7280"
-                ],
-                borderColor: [
-                  "#059669", "#DC2626", "#2563EB", "#D97706", "#4B5563"
-                ],
-                borderWidth: 2
-              }]
-            },
-            errorCodes: {
-              labels: ["NoError", "AccessDenied", "UnauthorizedOperation", "InvalidParameter", "Other"],
-              datasets: [{
-                data: [70, 15, 8, 5, 2],
-                backgroundColor: [
-                  "#10B981", "#EF4444", "#F59E0B", "#3B82F6", "#6B7280"
-                ],
-                borderColor: [
-                  "#059669", "#DC2626", "#D97706", "#2563EB", "#4B5563"
-                ],
-                borderWidth: 2
-              }]
-            },
-            eventsOverTime: {
-              labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-              datasets: [{
-                label: "Total Events",
-                data: [120, 145, 132, 168, 189, 156, 142],
-                borderColor: "#3B82F6",
-                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                tension: 0.4
-              }]
-            },
-            errorsOverTime: {
-              labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-              datasets: [{
-                label: "Errors",
-                data: [12, 18, 15, 22, 25, 19, 16],
-                borderColor: "#EF4444",
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                tension: 0.4
-              }]
-            },
-            highRiskEventsTrend: {
-              labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-              datasets: [{
-                label: "High Risk Events",
-                data: [8, 12, 9, 15, 18, 11, 10],
-                borderColor: "#DC2626",
-                backgroundColor: "rgba(220, 38, 38, 0.1)",
-                tension: 0.4
-              }]
-            },
-            topEventNames: {
-              labels: ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser"],
-              datasets: [{
-                label: "Event Count",
-                data: [45, 25, 12, 8, 6],
-                backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
-                borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
-                borderWidth: 1
-              }]
-            },
-            topIpSources: {
-              labels: ["192.168.1.100", "10.0.0.50", "172.16.0.25", "203.0.113.0", "198.51.100.0"],
-              datasets: [{
-                label: "Request Count",
-                data: [156, 89, 67, 45, 32],
-                backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
-                borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
-                borderWidth: 1
-              }]
-            },
-            topIamUsers: {
-              labels: ["admin", "developer", "root", "user1", "user2"],
-              datasets: [{
-                label: "Event Count",
-                data: [89, 67, 45, 32, 28],
-                backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
-                borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
-                borderWidth: 1
-              }]
-            },
-            regionActivity: {
-              labels: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
-              datasets: [{
-                label: "Log Count",
-                data: [234, 189, 156, 123, 89],
-                backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
-                borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
-                borderWidth: 1
-              }]
-            },
-            userActivityByType: {
-              labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-              datasets: [
-                {
-                  label: "AwsApiCall",
-                  data: [45, 52, 48, 61, 67, 58, 49],
-                  borderColor: "#3B82F6",
-                  backgroundColor: "rgba(59, 130, 246, 0.3)",
-                  fill: true
-                },
-                {
-                  label: "ConsoleLogin",
-                  data: [25, 28, 22, 31, 35, 29, 26],
-                  borderColor: "#10B981",
-                  backgroundColor: "rgba(16, 185, 129, 0.3)",
-                  fill: true
-                },
-                {
-                  label: "CreateUser",
-                  data: [12, 15, 11, 18, 22, 16, 13],
-                  borderColor: "#F59E0B",
-                  backgroundColor: "rgba(245, 158, 11, 0.3)",
-                  fill: true
-                }
-              ]
-            },
-            eventTypePerRegion: {
-              labels: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
-              datasets: [
-                {
-                  label: "AwsApiCall",
-                  data: [89, 67, 45, 32, 28],
-                  borderColor: "#3B82F6",
-                  backgroundColor: "rgba(59, 130, 246, 0.3)",
-                  fill: true
-                },
-                {
-                  label: "ConsoleLogin",
-                  data: [45, 38, 29, 21, 18],
-                  borderColor: "#10B981",
-                  backgroundColor: "rgba(16, 185, 129, 0.3)",
-                  fill: true
-                },
-                {
-                  label: "CreateUser",
-                  data: [23, 19, 15, 11, 9],
-                  borderColor: "#F59E0B",
-                  backgroundColor: "rgba(245, 158, 11, 0.3)",
-                  fill: true
-                }
-              ]
-            },
-            hourlyActivityHeatmap: {
-              labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"],
-              datasets: [{
-                label: "Activity Level",
-                data: [15, 8, 45, 89, 67, 34],
-                backgroundColor: ["#10B981", "#34D399", "#6EE7B7", "#F59E0B", "#EF4444", "#DC2626"],
-                borderColor: ["#059669", "#10B981", "#34D399", "#D97706", "#DC2626", "#B91C1C"],
-                borderWidth: 1
-              }]
-            },
-            regionVsEventTypeHeatmap: {
-              labels: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
-              datasets: [{
-                label: "Event Count",
-                data: [234, 189, 156, 123, 89],
-                backgroundColor: ["#10B981", "#34D399", "#6EE7B7", "#F59E0B", "#EF4444"],
-                borderColor: ["#059669", "#10B981", "#34D399", "#D97706", "#DC2626"],
-                borderWidth: 1
-              }]
-            }
+            eventTypeDistribution: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [], borderWidth: 2 }] },
+            userIdentityTypes: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [], borderWidth: 2 }] },
+            errorCodes: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: [], borderWidth: 2 }] },
+            eventsOverTime: { labels: [], datasets: [{ label: 'Total Events', data: [], borderColor: '#3B82F6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.4 }] },
+            errorsOverTime: { labels: [], datasets: [{ label: 'Errors', data: [], borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.4 }] },
+            highRiskEventsTrend: { labels: [], datasets: [{ label: 'High Risk Events', data: [], borderColor: '#DC2626', backgroundColor: 'rgba(220, 38, 38, 0.1)', tension: 0.4 }] },
+            topEventNames: { labels: [], datasets: [{ label: 'Event Count', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+            topIpSources: { labels: [], datasets: [{ label: 'Request Count', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+            topIamUsers: { labels: [], datasets: [{ label: 'Event Count', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+            regionActivity: { labels: [], datasets: [{ label: 'Log Count', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+            userActivityByType: { labels: [], datasets: [] },
+            eventTypePerRegion: { labels: [], datasets: [] },
+            hourlyActivityHeatmap: { labels: [], datasets: [{ label: 'Activity Level', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+            regionVsEventTypeHeatmap: { labels: [], datasets: [{ label: 'Event Count', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] }
           });
         }
       } catch (err: any) {
@@ -528,9 +339,9 @@ export default function Analytics() {
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
             Security Analytics
           </h1>
-          {(!data || !chartData) && (
+          {(!data?.userResourceGraph?.length && !chartData?.eventTypeDistribution?.labels?.length) && (
             <span className="px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded-full">
-              Demo Mode
+              No Data Available
             </span>
           )}
         </div>
@@ -545,15 +356,15 @@ export default function Analytics() {
       </div>
 
       {showError && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex">
-            <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+            <ExclamationTriangleIcon className="h-5 w-5 text-blue-400" />
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
-                Demo Mode
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                No Data Available
               </h3>
-              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                {error} The charts below show sample data for demonstration purposes.
+              <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                Start processing logs to see real analytics data. The charts will populate with your actual security data.
               </div>
             </div>
           </div>
