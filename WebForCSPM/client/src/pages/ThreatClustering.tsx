@@ -108,7 +108,7 @@ export default function ThreatClustering() {
     return seedRef.current / 233280;
   };
 
-  // K-Means++ initialization for better and deterministic clustering
+  // K-Means++ initialization for optimal clustering
   // This algorithm chooses initial centroids more intelligently than random selection,
   // leading to better clustering quality and consistent results
   const kMeansPlusPlusInit = (data: number[][], k: number): number[][] => {
@@ -131,8 +131,9 @@ export default function ThreatClustering() {
           const distance = euclideanDistance(data[j], centroid);
           minDistance = Math.min(minDistance, distance);
         }
-        distances[j] = minDistance;
-        totalDistance += minDistance;
+        // Use distance squared for better spread (K-Means++ standard)
+        distances[j] = minDistance * minDistance;
+        totalDistance += distances[j];
       }
       
       // Choose next centroid with probability proportional to distance squared
@@ -158,12 +159,13 @@ export default function ThreatClustering() {
     const n = data.length;
     const d = data[0].length;
     
-    // Initialize centroids using K-Means++ for better and deterministic results
+    // Initialize centroids using K-Means++ for optimal results
     let centroids: number[][] = kMeansPlusPlusInit(data, k);
     
     let clusters: number[] = new Array(n).fill(0);
     let iterations = 0;
     let converged = false;
+    let previousCentroids: number[][] = [];
     
     while (!converged && iterations < maxIterations) {
       iterations++;
@@ -198,13 +200,22 @@ export default function ThreatClustering() {
           const centroid = clusterSums[i].map(sum => sum / clusterCounts[i]);
           newCentroids.push(centroid);
         } else {
-          newCentroids.push([...centroids[i]]);
+          // Handle empty clusters by reinitializing from data
+          const randomIndex = Math.floor(deterministicRandom() * n);
+          newCentroids.push([...data[randomIndex]]);
         }
       }
       
-      // Check convergence
-      converged = arraysEqual(clusters, newClusters);
+      // Check convergence using both cluster assignments and centroid movement
+      const clusterConverged = arraysEqual(clusters, newClusters);
+      const centroidConverged = previousCentroids.length > 0 && 
+        centroids.every((centroid, i) => 
+          euclideanDistance(centroid, previousCentroids[i]) < 1e-6
+        );
+      
+      converged = clusterConverged || centroidConverged;
       clusters = newClusters;
+      previousCentroids = [...centroids];
       centroids = newCentroids;
     }
     
@@ -220,33 +231,46 @@ export default function ThreatClustering() {
     return a.length === b.length && a.every((val, i) => val === b[i]);
   };
 
-  // Feature extraction for clustering
+  // Feature extraction for clustering with improved normalization
   const extractFeatures = (events: LogEvent[]): number[][] => {
+    // Calculate global statistics for better normalization
+    const riskScores = events.map(e => e.risk_score).filter(score => !isNaN(score) && isFinite(score));
+    const timestamps = events.map(e => new Date(e.timestamp).getTime()).filter(ts => !isNaN(ts));
+    
+    const minRisk = riskScores.length > 0 ? Math.min(...riskScores) : 0;
+    const maxRisk = riskScores.length > 0 ? Math.max(...riskScores) : 100;
+    const minTime = timestamps.length > 0 ? Math.min(...timestamps) : Date.now();
+    const maxTime = timestamps.length > 0 ? Math.max(...timestamps) : Date.now();
+    
     return events.map((event, index) => {
       try {
-        // Validate required fields
-        if (typeof event.risk_score !== 'number' || isNaN(event.risk_score)) {
-          console.warn(`Invalid risk_score for event ${index}:`, event.risk_score);
-          event.risk_score = 0;
+        // Validate and sanitize required fields
+        let riskScore = event.risk_score;
+        if (typeof riskScore !== 'number' || isNaN(riskScore) || !isFinite(riskScore)) {
+          console.warn(`Invalid risk_score for event ${index}:`, riskScore);
+          riskScore = 0;
         }
         
-        if (!event.timestamp) {
+        let timestamp = event.timestamp;
+        if (!timestamp) {
           console.warn(`Missing timestamp for event ${index}`);
-          event.timestamp = new Date().toISOString();
+          timestamp = new Date().toISOString();
         }
         
-        // Normalize features for clustering
-        const riskScore = Math.max(0, Math.min(1, event.risk_score / 100)); // Normalize to 0-1, clamp values
-        const timestamp = new Date(event.timestamp).getTime() / (24 * 60 * 60 * 1000); // Days since epoch
-        const regionHash = hashString(event.aws_region || 'unknown') / 1000; // Normalize region hash
-        const userTypeHash = hashString(event.user_identity_type || 'unknown') / 1000; // Normalize user type hash
-        const errorHash = hashString(event.error_code || 'NoError') / 1000; // Normalize error hash
+        // Normalize features for clustering with improved scaling
+        const normalizedRiskScore = maxRisk > minRisk ? (riskScore - minRisk) / (maxRisk - minRisk) : 0.5;
+        const normalizedTimestamp = maxTime > minTime ? (new Date(timestamp).getTime() - minTime) / (maxTime - minTime) : 0.5;
         
-        return [riskScore, timestamp, regionHash, userTypeHash, errorHash];
+        // Hash-based features with better normalization
+        const regionHash = (hashString(event.aws_region || 'unknown') % 1000) / 1000; // Normalize to 0-1
+        const userTypeHash = (hashString(event.user_identity_type || 'unknown') % 1000) / 1000; // Normalize to 0-1
+        const errorHash = (hashString(event.error_code || 'NoError') % 1000) / 1000; // Normalize to 0-1
+        
+        return [normalizedRiskScore, normalizedTimestamp, regionHash, userTypeHash, errorHash];
       } catch (error) {
         console.error(`Error extracting features for event ${index}:`, error, event);
         // Return default feature vector for this event
-        return [0, 0, 0, 0, 0];
+        return [0.5, 0.5, 0.5, 0.5, 0.5];
       }
     });
   };
@@ -314,17 +338,20 @@ export default function ThreatClustering() {
     const timestamps = events.map(e => new Date(e.timestamp).getTime()).sort();
     const timeSpan = timestamps[timestamps.length - 1] - timestamps[0];
     
-    // Calculate events per hour with more realistic handling of short time spans
+    // Calculate events per hour with proper mathematical handling
     let eventsPerHour: number;
-    if (timeSpan < 60000) { // Less than 1 minute
-      // For very short spans, use events per minute and convert to hourly rate
-      // But cap it at a reasonable maximum to avoid unrealistic numbers
+    if (timeSpan === 0) {
+      // All events have the same timestamp - this is a burst event
+      // For burst events, we cannot calculate a meaningful hourly rate
+      // Instead, we'll use the actual event count as a burst indicator
+      eventsPerHour = events.length; // This represents the burst size, not hourly rate
+    } else if (timeSpan < 60000) { // Less than 1 minute
+      // For very short spans, calculate the actual rate
       const eventsPerMinute = events.length / (timeSpan / (1000 * 60));
-      eventsPerHour = Math.min(eventsPerMinute * 60, 1000); // Cap at 1000 events/hour
+      eventsPerHour = eventsPerMinute * 60; // Convert to hourly rate
     } else if (timeSpan < 3600000) { // Less than 1 hour
-      // For spans less than 1 hour, extrapolate but be conservative
-      const extrapolatedRate = events.length / (timeSpan / (1000 * 60 * 60));
-      eventsPerHour = Math.min(extrapolatedRate, 500); // Cap at 500 events/hour
+      // For spans less than 1 hour, calculate the actual rate
+      eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
     } else {
       // For spans of 1 hour or more, use the actual calculation
       eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
@@ -406,17 +433,20 @@ export default function ThreatClustering() {
     const timestamps = events.map(e => new Date(e.timestamp).getTime()).sort();
     const timeSpan = timestamps[timestamps.length - 1] - timestamps[0];
     
-    // Calculate events per hour with more realistic handling of short time spans
+    // Calculate events per hour with proper mathematical handling
     let eventsPerHour: number;
-    if (timeSpan < 60000) { // Less than 1 minute
-      // For very short spans, use events per minute and convert to hourly rate
-      // But cap it at a reasonable maximum to avoid unrealistic numbers
+    if (timeSpan === 0) {
+      // All events have the same timestamp - this is a burst event
+      // For burst events, we cannot calculate a meaningful hourly rate
+      // Instead, we'll use the actual event count as a burst indicator
+      eventsPerHour = events.length; // This represents the burst size, not hourly rate
+    } else if (timeSpan < 60000) { // Less than 1 minute
+      // For very short spans, calculate the actual rate
       const eventsPerMinute = events.length / (timeSpan / (1000 * 60));
-      eventsPerHour = Math.min(eventsPerMinute * 60, 1000); // Cap at 1000 events/hour
+      eventsPerHour = eventsPerMinute * 60; // Convert to hourly rate
     } else if (timeSpan < 3600000) { // Less than 1 hour
-      // For spans less than 1 hour, extrapolate but be conservative
-      const extrapolatedRate = events.length / (timeSpan / (1000 * 60 * 60));
-      eventsPerHour = Math.min(extrapolatedRate, 500); // Cap at 500 events/hour
+      // For spans less than 1 hour, calculate the actual rate
+      eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
     } else {
       // For spans of 1 hour or more, use the actual calculation
       eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
@@ -520,24 +550,45 @@ export default function ThreatClustering() {
   };
 
   const calculateSilhouetteScore = (features: number[][], clusters: number[]): number => {
-    // Simplified silhouette score calculation
+    // Improved silhouette score calculation with better handling of edge cases
     let totalSilhouette = 0;
+    let validPoints = 0;
     const uniqueClusters = [...new Set(clusters)];
+    
+    // Need at least 2 clusters for meaningful silhouette score
+    if (uniqueClusters.length < 2) {
+      return 0;
+    }
     
     for (let i = 0; i < features.length; i++) {
       const currentCluster = clusters[i];
       const sameClusterPoints = features.filter((_, idx) => clusters[idx] === currentCluster && idx !== i);
       const otherClusterPoints = features.filter((_, idx) => clusters[idx] !== currentCluster);
       
+      // Skip points that are alone in their cluster or when no other clusters exist
       if (sameClusterPoints.length === 0 || otherClusterPoints.length === 0) continue;
       
+      // Calculate average distance to points in same cluster (cohesion)
       const a = sameClusterPoints.reduce((sum, point) => sum + euclideanDistance(features[i], point), 0) / sameClusterPoints.length;
-      const b = otherClusterPoints.reduce((sum, point) => sum + euclideanDistance(features[i], point), 0) / otherClusterPoints.length;
       
-      totalSilhouette += (b - a) / Math.max(a, b);
+      // Calculate minimum average distance to points in other clusters (separation)
+      const clusterDistances = uniqueClusters
+        .filter(clusterId => clusterId !== currentCluster)
+        .map(clusterId => {
+          const clusterPoints = features.filter((_, idx) => clusters[idx] === clusterId);
+          return clusterPoints.reduce((sum, point) => sum + euclideanDistance(features[i], point), 0) / clusterPoints.length;
+        });
+      
+      const b = Math.min(...clusterDistances);
+      
+      // Calculate silhouette coefficient for this point
+      const silhouette = (b - a) / Math.max(a, b);
+      totalSilhouette += silhouette;
+      validPoints++;
     }
     
-    return Math.round((totalSilhouette / features.length) * 100);
+    // Return average silhouette score, scaled to 0-100
+    return validPoints > 0 ? Math.round((totalSilhouette / validPoints) * 100) : 0;
   };
 
   const calculateWithinClusterVariance = (features: number[][], clusters: number[], centroids: number[][]): number => {
@@ -584,17 +635,20 @@ export default function ThreatClustering() {
     const timestamps = events.map(e => new Date(e.timestamp).getTime()).sort();
     const timeSpan = timestamps[timestamps.length - 1] - timestamps[0];
     
-    // Calculate events per hour with more realistic handling of short time spans
+    // Calculate events per hour with proper mathematical handling
     let eventsPerHour: number;
-    if (timeSpan < 60000) { // Less than 1 minute
-      // For very short spans, use events per minute and convert to hourly rate
-      // But cap it at a reasonable maximum to avoid unrealistic numbers
+    if (timeSpan === 0) {
+      // All events have the same timestamp - this is a burst event
+      // For burst events, we cannot calculate a meaningful hourly rate
+      // Instead, we'll use the actual event count as a burst indicator
+      eventsPerHour = events.length; // This represents the burst size, not hourly rate
+    } else if (timeSpan < 60000) { // Less than 1 minute
+      // For very short spans, calculate the actual rate
       const eventsPerMinute = events.length / (timeSpan / (1000 * 60));
-      eventsPerHour = Math.min(eventsPerMinute * 60, 1000); // Cap at 1000 events/hour
+      eventsPerHour = eventsPerMinute * 60; // Convert to hourly rate
     } else if (timeSpan < 3600000) { // Less than 1 hour
-      // For spans less than 1 hour, extrapolate but be conservative
-      const extrapolatedRate = events.length / (timeSpan / (1000 * 60 * 60));
-      eventsPerHour = Math.min(extrapolatedRate, 500); // Cap at 500 events/hour
+      // For spans less than 1 hour, calculate the actual rate
+      eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
     } else {
       // For spans of 1 hour or more, use the actual calculation
       eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
@@ -605,7 +659,11 @@ export default function ThreatClustering() {
     // Add attack type specific explanation
     switch (attackType) {
       case "Brute Force Attack":
-        explanation += `The high error rate (${Math.round(errorRate * 100)}%) and rapid activity (${Math.round(eventsPerHour)} events/hour) from ${uniqueIPs} source IP(s) indicates a brute force attack attempting to gain unauthorized access. `;
+        if (timeSpan === 0) {
+          explanation += `The high error rate (${Math.round(errorRate * 100)}%) and burst activity (${events.length} events simultaneously) from ${uniqueIPs} source IP(s) indicates a brute force attack attempting to gain unauthorized access. `;
+        } else {
+          explanation += `The high error rate (${Math.round(errorRate * 100)}%) and rapid activity (${Math.round(eventsPerHour)} events/hour) from ${uniqueIPs} source IP(s) indicates a brute force attack attempting to gain unauthorized access. `;
+        }
         break;
       case "Credential Stuffing":
         explanation += `Multiple IP addresses (${uniqueIPs}) are attempting authentication with a high failure rate (${Math.round(errorRate * 100)}%), suggesting stolen credentials are being tested across your infrastructure. `;
@@ -617,7 +675,11 @@ export default function ThreatClustering() {
         explanation += `High-risk data access operations (avg risk: ${Math.round(avgRiskScore)}) across ${uniqueRegions} regions indicate potential data theft attempts. `;
         break;
       case "Resource Abuse":
-        explanation += `High volume of resource creation (${Math.round(eventsPerHour)} events/hour) suggests potential resource hijacking or crypto mining activity. `;
+        if (timeSpan === 0) {
+          explanation += `High volume of resource creation (${events.length} events in burst) suggests potential resource hijacking or crypto mining activity. `;
+        } else {
+          explanation += `High volume of resource creation (${Math.round(eventsPerHour)} events/hour) suggests potential resource hijacking or crypto mining activity. `;
+        }
         break;
       case "Destructive Attack":
         explanation += `Delete/terminate operations with high risk scores (${Math.round(avgRiskScore)}) indicate a destructive attack attempting to damage your infrastructure. `;
@@ -629,13 +691,21 @@ export default function ThreatClustering() {
         explanation += `User and role creation activities indicate an attacker is attempting to establish persistent access. `;
         break;
       case "API Abuse":
-        explanation += `High volume of API calls (${Math.round(eventsPerHour)} events/hour) suggests potential API abuse or rate limit testing. `;
+        if (timeSpan === 0) {
+          explanation += `High volume of API calls (${events.length} events in burst) suggests potential API abuse or rate limit testing. `;
+        } else {
+          explanation += `High volume of API calls (${Math.round(eventsPerHour)} events/hour) suggests potential API abuse or rate limit testing. `;
+        }
         break;
       case "Geographic Anomaly":
         explanation += `Unusual geographic distribution across ${uniqueRegions} regions suggests coordinated attack from multiple locations. `;
         break;
       case "Time-based Anomaly":
-        explanation += `Unusual activity patterns (${Math.round(eventsPerHour)} events/hour) suggest automated or coordinated attack behavior. `;
+        if (timeSpan === 0) {
+          explanation += `Unusual activity patterns (${events.length} events in burst) suggest automated or coordinated attack behavior. `;
+        } else {
+          explanation += `Unusual activity patterns (${Math.round(eventsPerHour)} events/hour) suggest automated or coordinated attack behavior. `;
+        }
         break;
       case "Suspicious Activity":
         explanation += `Multiple suspicious indicators including high risk scores (${Math.round(avgRiskScore)}) and error rates (${Math.round(errorRate * 100)}%) suggest potential malicious activity. `;
@@ -678,17 +748,20 @@ export default function ThreatClustering() {
     const timestamps = events.map(e => new Date(e.timestamp).getTime()).sort();
     const timeSpan = timestamps[timestamps.length - 1] - timestamps[0];
     
-    // Calculate events per hour with more realistic handling of short time spans
+    // Calculate events per hour with proper mathematical handling
     let eventsPerHour: number;
-    if (timeSpan < 60000) { // Less than 1 minute
-      // For very short spans, use events per minute and convert to hourly rate
-      // But cap it at a reasonable maximum to avoid unrealistic numbers
+    if (timeSpan === 0) {
+      // All events have the same timestamp - this is a burst event
+      // For burst events, we cannot calculate a meaningful hourly rate
+      // Instead, we'll use the actual event count as a burst indicator
+      eventsPerHour = events.length; // This represents the burst size, not hourly rate
+    } else if (timeSpan < 60000) { // Less than 1 minute
+      // For very short spans, calculate the actual rate
       const eventsPerMinute = events.length / (timeSpan / (1000 * 60));
-      eventsPerHour = Math.min(eventsPerMinute * 60, 1000); // Cap at 1000 events/hour
+      eventsPerHour = eventsPerMinute * 60; // Convert to hourly rate
     } else if (timeSpan < 3600000) { // Less than 1 hour
-      // For spans less than 1 hour, extrapolate but be conservative
-      const extrapolatedRate = events.length / (timeSpan / (1000 * 60 * 60));
-      eventsPerHour = Math.min(extrapolatedRate, 500); // Cap at 500 events/hour
+      // For spans less than 1 hour, calculate the actual rate
+      eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
     } else {
       // For spans of 1 hour or more, use the actual calculation
       eventsPerHour = events.length / (timeSpan / (1000 * 60 * 60));
@@ -711,7 +784,9 @@ export default function ThreatClustering() {
       riskFactors.push(`Multiple source IPs (${uniqueIPs}) suggests botnet or distributed attack`);
     }
     
-    if (eventsPerHour > 50) {
+    if (timeSpan === 0 && events.length > 10) {
+      riskFactors.push(`Burst activity (${events.length} events simultaneously) suggests automated attack`);
+    } else if (eventsPerHour > 50) {
       riskFactors.push(`High activity volume (${Math.round(eventsPerHour)} events/hour) suggests automated attack`);
     }
     
@@ -858,8 +933,22 @@ export default function ThreatClustering() {
   const calculateTimeSpan = (events: LogEvent[]): string => {
     const timestamps = events.map(e => new Date(e.timestamp).getTime()).sort();
     const duration = timestamps[timestamps.length - 1] - timestamps[0];
-    const hours = Math.floor(duration / (1000 * 60 * 60));
-    return `${hours} hours`;
+    
+    // Handle edge cases where all events have the same timestamp
+    if (duration === 0) {
+      return "0 minutes";
+    }
+    
+    const hours = duration / (1000 * 60 * 60);
+    const minutes = duration / (1000 * 60);
+    
+    if (hours >= 1) {
+      return `${Math.round(hours * 10) / 10} hours`;
+    } else if (minutes >= 1) {
+      return `${Math.round(minutes)} minutes`;
+    } else {
+      return `${Math.round(duration / 1000)} seconds`;
+    }
   };
 
   // Fetch logs for clustering
