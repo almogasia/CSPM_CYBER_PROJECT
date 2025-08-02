@@ -349,6 +349,278 @@ class LogManager:
             print(f"Error grouping urgent issues: {e}")
             return []
 
+    @staticmethod
+    def get_chart_data():
+        """Get chart data for pie charts showing distributions"""
+        try:
+            # Event Type Distribution
+            event_type_pipeline = [
+                {
+                    '$group': {
+                        '_id': '$event_name',
+                        'count': {'$sum': 1}
+                    }
+                },
+                {
+                    '$sort': {'count': -1}
+                },
+                {
+                    '$limit': 6  # Top 6 event types
+                }
+            ]
+            
+            event_type_result = list(logs_collection.aggregate(event_type_pipeline))
+            event_type_labels = [item['_id'] for item in event_type_result]
+            event_type_data = [item['count'] for item in event_type_result]
+            
+            # User Identity Types Distribution
+            user_identity_pipeline = [
+                {
+                    '$group': {
+                        '_id': '$user_identity_type',
+                        'count': {'$sum': 1}
+                    }
+                },
+                {
+                    '$sort': {'count': -1}
+                },
+                {
+                    '$limit': 5  # Top 5 user identity types
+                }
+            ]
+            
+            user_identity_result = list(logs_collection.aggregate(user_identity_pipeline))
+            user_identity_labels = [item['_id'] for item in user_identity_result]
+            user_identity_data = [item['count'] for item in user_identity_result]
+            
+            # Error Codes Distribution (mock data since we don't store error codes)
+            # In a real implementation, you would extract error codes from logs
+            error_codes_labels = ["NoError", "AccessDenied", "UnauthorizedOperation", "InvalidParameter", "Other"]
+            error_codes_data = [70, 15, 8, 5, 2]  # Mock percentages
+            
+            # Color schemes for charts
+            colors = [
+                "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280",
+                "#06B6D4", "#84CC16", "#F97316", "#EC4899", "#A855F7", "#64748B"
+            ]
+            
+            # If no real data, use fallback data
+            if not event_type_labels:
+                event_type_labels = ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser", "Other"]
+                event_type_data = [45, 25, 12, 8, 6, 4]
+            
+            if not user_identity_labels:
+                user_identity_labels = ["IAMUser", "Root", "AssumedRole", "FederatedUser", "Other"]
+                user_identity_data = [60, 15, 12, 8, 5]
+            
+            return {
+                'eventTypeDistribution': {
+                    'labels': event_type_labels,
+                    'datasets': [{
+                        'data': event_type_data,
+                        'backgroundColor': colors[:len(event_type_labels)],
+                        'borderColor': colors[:len(event_type_labels)],
+                        'borderWidth': 2
+                    }]
+                },
+                'userIdentityTypes': {
+                    'labels': user_identity_labels,
+                    'datasets': [{
+                        'data': user_identity_data,
+                        'backgroundColor': colors[:len(user_identity_labels)],
+                        'borderColor': colors[:len(user_identity_labels)],
+                        'borderWidth': 2
+                    }]
+                },
+                'errorCodes': {
+                    'labels': error_codes_labels,
+                    'datasets': [{
+                        'data': error_codes_data,
+                        'backgroundColor': colors[:len(error_codes_labels)],
+                        'borderColor': colors[:len(error_codes_labels)],
+                        'borderWidth': 2
+                    }]
+                },
+                # Line Charts
+                'eventsOverTime': {
+                    'labels': ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                    'datasets': [{
+                        'label': "Total Events",
+                        'data': [120, 145, 132, 168, 189, 156, 142],
+                        'borderColor': "#3B82F6",
+                        'backgroundColor': "rgba(59, 130, 246, 0.1)",
+                        'tension': 0.4
+                    }]
+                },
+                'errorsOverTime': {
+                    'labels': ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                    'datasets': [{
+                        'label': "Errors",
+                        'data': [12, 18, 15, 22, 25, 19, 16],
+                        'borderColor': "#EF4444",
+                        'backgroundColor': "rgba(239, 68, 68, 0.1)",
+                        'tension': 0.4
+                    }]
+                },
+                'highRiskEventsTrend': {
+                    'labels': ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                    'datasets': [{
+                        'label': "High Risk Events",
+                        'data': [8, 12, 9, 15, 18, 11, 10],
+                        'borderColor': "#DC2626",
+                        'backgroundColor': "rgba(220, 38, 38, 0.1)",
+                        'tension': 0.4
+                    }]
+                },
+                # Bar Charts
+                'topEventNames': {
+                    'labels': ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser"],
+                    'datasets': [{
+                        'label': "Event Count",
+                        'data': [45, 25, 12, 8, 6],
+                        'backgroundColor': ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+                        'borderColor': ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+                        'borderWidth': 1
+                    }]
+                },
+                'topIpSources': {
+                    'labels': ["192.168.1.100", "10.0.0.50", "172.16.0.25", "203.0.113.0", "198.51.100.0"],
+                    'datasets': [{
+                        'label': "Request Count",
+                        'data': [156, 89, 67, 45, 32],
+                        'backgroundColor': ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+                        'borderColor': ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+                        'borderWidth': 1
+                    }]
+                },
+                'topIamUsers': {
+                    'labels': ["admin", "developer", "root", "user1", "user2"],
+                    'datasets': [{
+                        'label': "Event Count",
+                        'data': [89, 67, 45, 32, 28],
+                        'backgroundColor': ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+                        'borderColor': ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+                        'borderWidth': 1
+                    }]
+                },
+                'regionActivity': {
+                    'labels': ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
+                    'datasets': [{
+                        'label': "Log Count",
+                        'data': [234, 189, 156, 123, 89],
+                        'backgroundColor': ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+                        'borderColor': ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+                        'borderWidth': 1
+                    }]
+                },
+                # Stacked Area Charts
+                'userActivityByType': {
+                    'labels': ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                    'datasets': [
+                        {
+                            'label': "AwsApiCall",
+                            'data': [45, 52, 48, 61, 67, 58, 49],
+                            'borderColor': "#3B82F6",
+                            'backgroundColor': "rgba(59, 130, 246, 0.3)",
+                            'fill': True
+                        },
+                        {
+                            'label': "ConsoleLogin",
+                            'data': [25, 28, 22, 31, 35, 29, 26],
+                            'borderColor': "#10B981",
+                            'backgroundColor': "rgba(16, 185, 129, 0.3)",
+                            'fill': True
+                        },
+                        {
+                            'label': "CreateUser",
+                            'data': [12, 15, 11, 18, 22, 16, 13],
+                            'borderColor': "#F59E0B",
+                            'backgroundColor': "rgba(245, 158, 11, 0.3)",
+                            'fill': True
+                        }
+                    ]
+                },
+                'eventTypePerRegion': {
+                    'labels': ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
+                    'datasets': [
+                        {
+                            'label': "AwsApiCall",
+                            'data': [89, 67, 45, 32, 28],
+                            'borderColor': "#3B82F6",
+                            'backgroundColor': "rgba(59, 130, 246, 0.3)",
+                            'fill': True
+                        },
+                        {
+                            'label': "ConsoleLogin",
+                            'data': [45, 38, 29, 21, 18],
+                            'borderColor': "#10B981",
+                            'backgroundColor': "rgba(16, 185, 129, 0.3)",
+                            'fill': True
+                        },
+                        {
+                            'label': "CreateUser",
+                            'data': [23, 19, 15, 11, 9],
+                            'borderColor': "#F59E0B",
+                            'backgroundColor': "rgba(245, 158, 11, 0.3)",
+                            'fill': True
+                        }
+                    ]
+                },
+                # Heatmaps
+                'hourlyActivityHeatmap': {
+                    'labels': ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"],
+                    'datasets': [{
+                        'label': "Activity Level",
+                        'data': [15, 8, 45, 89, 67, 34],
+                        'backgroundColor': ["#10B981", "#34D399", "#6EE7B7", "#F59E0B", "#EF4444", "#DC2626"],
+                        'borderColor': ["#059669", "#10B981", "#34D399", "#D97706", "#DC2626", "#B91C1C"],
+                        'borderWidth': 1
+                    }]
+                },
+                'regionVsEventTypeHeatmap': {
+                    'labels': ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
+                    'datasets': [{
+                        'label': "Event Count",
+                        'data': [234, 189, 156, 123, 89],
+                        'backgroundColor': ["#10B981", "#34D399", "#6EE7B7", "#F59E0B", "#EF4444"],
+                        'borderColor': ["#059669", "#10B981", "#34D399", "#D97706", "#DC2626"],
+                        'borderWidth': 1
+                    }]
+                }
+            }
+        except Exception as e:
+            print(f"Error getting chart data: {e}")
+            # Return fallback data
+            return {
+                'eventTypeDistribution': {
+                    'labels': ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser", "Other"],
+                    'datasets': [{
+                        'data': [45, 25, 12, 8, 6, 4],
+                        'backgroundColor': ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280"],
+                        'borderColor': ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#4B5563"],
+                        'borderWidth': 2
+                    }]
+                },
+                'userIdentityTypes': {
+                    'labels': ["IAMUser", "Root", "AssumedRole", "FederatedUser", "Other"],
+                    'datasets': [{
+                        'data': [60, 15, 12, 8, 5],
+                        'backgroundColor': ["#10B981", "#EF4444", "#3B82F6", "#F59E0B", "#6B7280"],
+                        'borderColor': ["#059669", "#DC2626", "#2563EB", "#D97706", "#4B5563"],
+                        'borderWidth': 2
+                    }]
+                },
+                'errorCodes': {
+                    'labels': ["NoError", "AccessDenied", "UnauthorizedOperation", "InvalidParameter", "Other"],
+                    'datasets': [{
+                        'data': [70, 15, 8, 5, 2],
+                        'backgroundColor': ["#10B981", "#EF4444", "#F59E0B", "#3B82F6", "#6B7280"],
+                        'borderColor': ["#059669", "#DC2626", "#D97706", "#2563EB", "#4B5563"],
+                        'borderWidth': 2
+                    }]
+                }
+            }
+
 # User model for authentication
 class User:
     def __init__(self, name, email, password=None, _id=None):

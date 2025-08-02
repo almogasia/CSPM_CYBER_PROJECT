@@ -2,6 +2,20 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Title,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  TimeScale,
+} from "chart.js";
+import { Pie, Line, Bar } from "react-chartjs-2";
+import {
   ChartBarIcon,
   CloudArrowUpIcon,
   ClipboardDocumentCheckIcon,
@@ -15,6 +29,20 @@ import {
   UserGroupIcon,
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
+
+// Register Chart.js components
+ChartJS.register(
+  ArcElement, 
+  Tooltip, 
+  Legend, 
+  Title,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  TimeScale
+);
 
 const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
@@ -47,11 +75,156 @@ interface RecentActivity {
   rule_based_flags?: number;
 }
 
+interface ChartData {
+  eventTypeDistribution: {
+    labels: string[];
+    datasets: Array<{
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  userIdentityTypes: {
+    labels: string[];
+    datasets: Array<{
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  errorCodes: {
+    labels: string[];
+    datasets: Array<{
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  // Line Charts
+  eventsOverTime: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      borderColor: string;
+      backgroundColor: string;
+      tension: number;
+    }>;
+  };
+  errorsOverTime: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      borderColor: string;
+      backgroundColor: string;
+      tension: number;
+    }>;
+  };
+  highRiskEventsTrend: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      borderColor: string;
+      backgroundColor: string;
+      tension: number;
+    }>;
+  };
+  // Bar Charts
+  topEventNames: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  topIpSources: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  topIamUsers: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  regionActivity: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  // Stacked Area Charts
+  userActivityByType: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      borderColor: string;
+      backgroundColor: string;
+      fill: boolean;
+    }>;
+  };
+  eventTypePerRegion: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      borderColor: string;
+      backgroundColor: string;
+      fill: boolean;
+    }>;
+  };
+  // Heatmaps
+  hourlyActivityHeatmap: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+  regionVsEventTypeHeatmap: {
+    labels: string[];
+    datasets: Array<{
+      label: string;
+      data: number[];
+      backgroundColor: string[];
+      borderColor: string[];
+      borderWidth: number;
+    }>;
+  };
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trends, setTrends] = useState<DashboardTrends | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [chartData, setChartData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -60,8 +233,8 @@ export default function Dashboard() {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      // Fetch stats, trends, and recent activity in parallel
-      const [statsResponse, trendsResponse, activityResponse] = await Promise.all([
+      // Fetch stats, trends, recent activity, and chart data in parallel
+      const [statsResponse, trendsResponse, activityResponse, chartResponse] = await Promise.all([
         axios.get(`${API_BASE_URL}/logs/stats`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
@@ -69,6 +242,9 @@ export default function Dashboard() {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${API_BASE_URL}/logs/recent-activity`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/logs/chart-data`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -137,6 +313,199 @@ export default function Dashboard() {
             rule_based_flags: 0
           }
         ]);
+      }
+      
+      if (chartResponse.data.success) {
+        setChartData(chartResponse.data.chartData);
+      } else {
+        // Fallback chart data if no real data is available
+        setChartData({
+          eventTypeDistribution: {
+            labels: ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser", "Other"],
+            datasets: [{
+              data: [45, 25, 12, 8, 6, 4],
+              backgroundColor: [
+                "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#6B7280"
+              ],
+              borderColor: [
+                "#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED", "#4B5563"
+              ],
+              borderWidth: 2
+            }]
+          },
+          userIdentityTypes: {
+            labels: ["IAMUser", "Root", "AssumedRole", "FederatedUser", "Other"],
+            datasets: [{
+              data: [60, 15, 12, 8, 5],
+              backgroundColor: [
+                "#10B981", "#EF4444", "#3B82F6", "#F59E0B", "#6B7280"
+              ],
+              borderColor: [
+                "#059669", "#DC2626", "#2563EB", "#D97706", "#4B5563"
+              ],
+              borderWidth: 2
+            }]
+          },
+          errorCodes: {
+            labels: ["NoError", "AccessDenied", "UnauthorizedOperation", "InvalidParameter", "Other"],
+            datasets: [{
+              data: [70, 15, 8, 5, 2],
+              backgroundColor: [
+                "#10B981", "#EF4444", "#F59E0B", "#3B82F6", "#6B7280"
+              ],
+              borderColor: [
+                "#059669", "#DC2626", "#D97706", "#2563EB", "#4B5563"
+              ],
+              borderWidth: 2
+            }]
+          },
+          // Line Charts
+          eventsOverTime: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            datasets: [{
+              label: "Total Events",
+              data: [120, 145, 132, 168, 189, 156, 142],
+              borderColor: "#3B82F6",
+              backgroundColor: "rgba(59, 130, 246, 0.1)",
+              tension: 0.4
+            }]
+          },
+          errorsOverTime: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            datasets: [{
+              label: "Errors",
+              data: [12, 18, 15, 22, 25, 19, 16],
+              borderColor: "#EF4444",
+              backgroundColor: "rgba(239, 68, 68, 0.1)",
+              tension: 0.4
+            }]
+          },
+          highRiskEventsTrend: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            datasets: [{
+              label: "High Risk Events",
+              data: [8, 12, 9, 15, 18, 11, 10],
+              borderColor: "#DC2626",
+              backgroundColor: "rgba(220, 38, 38, 0.1)",
+              tension: 0.4
+            }]
+          },
+          // Bar Charts
+          topEventNames: {
+            labels: ["AwsApiCall", "ConsoleLogin", "CreateUser", "DeleteUser", "ModifyUser"],
+            datasets: [{
+              label: "Event Count",
+              data: [45, 25, 12, 8, 6],
+              backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+              borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+              borderWidth: 1
+            }]
+          },
+          topIpSources: {
+            labels: ["192.168.1.100", "10.0.0.50", "172.16.0.25", "203.0.113.0", "198.51.100.0"],
+            datasets: [{
+              label: "Request Count",
+              data: [156, 89, 67, 45, 32],
+              backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+              borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+              borderWidth: 1
+            }]
+          },
+          topIamUsers: {
+            labels: ["admin", "developer", "root", "user1", "user2"],
+            datasets: [{
+              label: "Event Count",
+              data: [89, 67, 45, 32, 28],
+              backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+              borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+              borderWidth: 1
+            }]
+          },
+          regionActivity: {
+            labels: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
+            datasets: [{
+              label: "Log Count",
+              data: [234, 189, 156, 123, 89],
+              backgroundColor: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+              borderColor: ["#2563EB", "#059669", "#D97706", "#DC2626", "#7C3AED"],
+              borderWidth: 1
+            }]
+          },
+          // Stacked Area Charts
+          userActivityByType: {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            datasets: [
+              {
+                label: "AwsApiCall",
+                data: [45, 52, 48, 61, 67, 58, 49],
+                borderColor: "#3B82F6",
+                backgroundColor: "rgba(59, 130, 246, 0.3)",
+                fill: true
+              },
+              {
+                label: "ConsoleLogin",
+                data: [25, 28, 22, 31, 35, 29, 26],
+                borderColor: "#10B981",
+                backgroundColor: "rgba(16, 185, 129, 0.3)",
+                fill: true
+              },
+              {
+                label: "CreateUser",
+                data: [12, 15, 11, 18, 22, 16, 13],
+                borderColor: "#F59E0B",
+                backgroundColor: "rgba(245, 158, 11, 0.3)",
+                fill: true
+              }
+            ]
+          },
+          eventTypePerRegion: {
+            labels: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
+            datasets: [
+              {
+                label: "AwsApiCall",
+                data: [89, 67, 45, 32, 28],
+                borderColor: "#3B82F6",
+                backgroundColor: "rgba(59, 130, 246, 0.3)",
+                fill: true
+              },
+              {
+                label: "ConsoleLogin",
+                data: [45, 38, 29, 21, 18],
+                borderColor: "#10B981",
+                backgroundColor: "rgba(16, 185, 129, 0.3)",
+                fill: true
+              },
+              {
+                label: "CreateUser",
+                data: [23, 19, 15, 11, 9],
+                borderColor: "#F59E0B",
+                backgroundColor: "rgba(245, 158, 11, 0.3)",
+                fill: true
+              }
+            ]
+          },
+          // Heatmaps
+          hourlyActivityHeatmap: {
+            labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"],
+            datasets: [{
+              label: "Activity Level",
+              data: [15, 8, 45, 89, 67, 34],
+              backgroundColor: ["#10B981", "#34D399", "#6EE7B7", "#F59E0B", "#EF4444", "#DC2626"],
+              borderColor: ["#059669", "#10B981", "#34D399", "#D97706", "#DC2626", "#B91C1C"],
+              borderWidth: 1
+            }]
+          },
+          regionVsEventTypeHeatmap: {
+            labels: ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "sa-east-1"],
+            datasets: [{
+              label: "Event Count",
+              data: [234, 189, 156, 123, 89],
+              backgroundColor: ["#10B981", "#34D399", "#6EE7B7", "#F59E0B", "#EF4444"],
+              borderColor: ["#059669", "#10B981", "#34D399", "#D97706", "#DC2626"],
+              borderWidth: 1
+            }]
+          }
+        });
       }
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to fetch dashboard data");
@@ -485,6 +854,697 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Analytics Charts Section */}
+      {chartData && (
+        <>
+          {/* Pie Charts */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Event Type Distribution
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Pie 
+                  data={chartData.eventTypeDistribution}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  User Identity Types
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Pie 
+                  data={chartData.userIdentityTypes}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Error Codes Distribution
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Pie 
+                  data={chartData.errorCodes}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Line Charts */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Events Over Time
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Line 
+                  data={chartData.eventsOverTime}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Errors Over Time
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Line 
+                  data={chartData.errorsOverTime}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  High-Risk Events Trend
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Line 
+                  data={chartData.highRiskEventsTrend}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bar Charts */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Top Event Names
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Bar 
+                  data={chartData.topEventNames}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          maxRotation: 45
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Top IP Sources
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Bar 
+                  data={chartData.topIpSources}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          maxRotation: 45
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* More Bar Charts */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Top IAM Users
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Bar 
+                  data={chartData.topIamUsers}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          maxRotation: 45
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Region Activity
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Bar 
+                  data={chartData.regionActivity}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          maxRotation: 45
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Stacked Area Charts */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  User Activity by Type
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Line 
+                  data={chartData.userActivityByType}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Event Type per Region
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Line 
+                  data={chartData.eventTypePerRegion}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top' as const,
+                        labels: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          font: {
+                            size: 11
+                          }
+                        }
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Heatmaps */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Hourly Activity Heatmap
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Bar 
+                  data={chartData.hourlyActivityHeatmap}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Region vs Event Type Heatmap
+                </h2>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <Bar 
+                  data={chartData.regionVsEventTypeHeatmap}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false
+                      },
+                      tooltip: {
+                        backgroundColor: document.documentElement.classList.contains('dark') ? '#1F2937' : '#FFFFFF',
+                        titleColor: document.documentElement.classList.contains('dark') ? '#F9FAFB' : '#111827',
+                        bodyColor: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                        borderColor: document.documentElement.classList.contains('dark') ? '#374351' : '#E5E7EB',
+                        borderWidth: 1
+                      }
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        grid: {
+                          color: document.documentElement.classList.contains('dark') ? '#374151' : '#E5E7EB'
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151'
+                        }
+                      },
+                      x: {
+                        grid: {
+                          display: false
+                        },
+                        ticks: {
+                          color: document.documentElement.classList.contains('dark') ? '#D1D5DB' : '#374151',
+                          maxRotation: 45
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Quick Actions Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow duration-200">

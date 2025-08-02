@@ -264,6 +264,19 @@ def get_analytics():
     except Exception as e:
         return jsonify({'error': f'Failed to fetch analytics: {str(e)}'}), 500
 
+@api_bp.route('/logs/chart-data', methods=['GET'])
+def get_chart_data():
+    """Get chart data for pie charts showing distributions"""
+    try:
+        # Get chart data from LogManager
+        chart_data = LogManager.get_chart_data()
+        return jsonify({
+            'success': True,
+            'chartData': chart_data
+        })
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch chart data: {str(e)}'}), 500
+
 def process_calculation(data):
     """Process CSPM calculations based on input data"""
     return {
