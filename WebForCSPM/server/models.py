@@ -516,7 +516,11 @@ class User:
         return self
 
 class Deployment:
-    def __init__(self, file_name, file_type, file_size, deployment_type, status="pending", timestamp=None, user_id=None, _id=None):
+    def __init__(self, file_name, file_type, file_size, deployment_type, status="pending", timestamp=None, user_id=None, _id=None, 
+                 file_created_time=None, file_modified_time=None, file_accessed_time=None, file_extension=None, 
+                 file_path=None, file_owner=None, file_permissions=None, file_hash=None, file_encoding=None,
+                 file_description=None, deployment_notes=None, target_environment=None, deployment_duration=None,
+                 resources_allocated=None, security_scan_results=None, compliance_status=None):
         self.file_name = file_name
         self.file_type = file_type
         self.file_size = file_size
@@ -525,6 +529,26 @@ class Deployment:
         self.timestamp = timestamp or datetime.utcnow()
         self.user_id = user_id
         self._id = _id
+        
+        # Enhanced file properties
+        self.file_created_time = file_created_time
+        self.file_modified_time = file_modified_time
+        self.file_accessed_time = file_accessed_time
+        self.file_extension = file_extension
+        self.file_path = file_path
+        self.file_owner = file_owner
+        self.file_permissions = file_permissions
+        self.file_hash = file_hash
+        self.file_encoding = file_encoding
+        self.file_description = file_description
+        
+        # Deployment details
+        self.deployment_notes = deployment_notes
+        self.target_environment = target_environment
+        self.deployment_duration = deployment_duration
+        self.resources_allocated = resources_allocated
+        self.security_scan_results = security_scan_results
+        self.compliance_status = compliance_status
     
     def to_dict(self):
         return {
@@ -534,7 +558,27 @@ class Deployment:
             'deployment_type': self.deployment_type,
             'status': self.status,
             'timestamp': self.timestamp,
-            'user_id': self.user_id
+            'user_id': self.user_id,
+            
+            # Enhanced file properties
+            'file_created_time': self.file_created_time,
+            'file_modified_time': self.file_modified_time,
+            'file_accessed_time': self.file_accessed_time,
+            'file_extension': self.file_extension,
+            'file_path': self.file_path,
+            'file_owner': self.file_owner,
+            'file_permissions': self.file_permissions,
+            'file_hash': self.file_hash,
+            'file_encoding': self.file_encoding,
+            'file_description': self.file_description,
+            
+            # Deployment details
+            'deployment_notes': self.deployment_notes,
+            'target_environment': self.target_environment,
+            'deployment_duration': self.deployment_duration,
+            'resources_allocated': self.resources_allocated,
+            'security_scan_results': self.security_scan_results,
+            'compliance_status': self.compliance_status
         }
     
     @staticmethod
@@ -547,7 +591,27 @@ class Deployment:
             status=data.get('status'),
             timestamp=data.get('timestamp'),
             user_id=data.get('user_id'),
-            _id=data.get('_id')
+            _id=data.get('_id'),
+            
+            # Enhanced file properties
+            file_created_time=data.get('file_created_time'),
+            file_modified_time=data.get('file_modified_time'),
+            file_accessed_time=data.get('file_accessed_time'),
+            file_extension=data.get('file_extension'),
+            file_path=data.get('file_path'),
+            file_owner=data.get('file_owner'),
+            file_permissions=data.get('file_permissions'),
+            file_hash=data.get('file_hash'),
+            file_encoding=data.get('file_encoding'),
+            file_description=data.get('file_description'),
+            
+            # Deployment details
+            deployment_notes=data.get('deployment_notes'),
+            target_environment=data.get('target_environment'),
+            deployment_duration=data.get('deployment_duration'),
+            resources_allocated=data.get('resources_allocated'),
+            security_scan_results=data.get('security_scan_results'),
+            compliance_status=data.get('compliance_status')
         )
 
 class DeploymentManager:

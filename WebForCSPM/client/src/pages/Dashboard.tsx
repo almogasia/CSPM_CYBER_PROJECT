@@ -69,11 +69,24 @@ interface RecentActivity {
   requestParametersinstanceType?: string;
 }
 
+interface Deployment {
+  _id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  deployment_type: string;
+  status: string;
+  timestamp: string;
+  target_environment?: string;
+  deployment_notes?: string;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trends, setTrends] = useState<DashboardTrends | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -82,8 +95,8 @@ export default function Dashboard() {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      // Fetch stats, trends, and urgent issues (for top security alerts) in parallel
-      const [statsResponse, trendsResponse, urgentIssuesResponse] = await Promise.all([
+      // Fetch stats, trends, urgent issues, and deployments in parallel
+      const [statsResponse, trendsResponse, urgentIssuesResponse, deploymentsResponse] = await Promise.all([
         axios.get(`${API_BASE_URL}/logs/stats`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
@@ -91,6 +104,9 @@ export default function Dashboard() {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${API_BASE_URL}/urgent-issues`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/deployments`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -100,38 +116,43 @@ export default function Dashboard() {
       } else {
         setStats(null);
       }
-      
+
       if (trendsResponse.data.success) {
         setTrends(trendsResponse.data.trends);
       } else {
         setTrends(null);
       }
-      
+
       if (urgentIssuesResponse.data.success) {
-        // Get the top 3 highest risk logs from user's logs
-        const userLogs = urgentIssuesResponse.data.urgent_issues;
-        console.log('User logs for security alerts:', userLogs); // Debug log
+        // Sort by risk level and score to get top 3 highest risk logs
+        const sortedLogs = urgentIssuesResponse.data.urgent_issues.sort((a: RecentActivity, b: RecentActivity) => {
+          const riskLevelOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, SAFE: 1 };
+          const aLevel = riskLevelOrder[a.risk_level] || 0;
+          const bLevel = riskLevelOrder[b.risk_level] || 0;
+          
+          if (aLevel !== bLevel) {
+            return bLevel - aLevel; // Higher risk first
+          }
+          return b.risk_score - a.risk_score; // Higher score first
+        });
         
-        const topRiskLogs = userLogs
-          .sort((a: any, b: any) => {
-            const riskOrder = { 'CRITICAL': 5, 'HIGH': 4, 'MEDIUM': 3, 'LOW': 2, 'SAFE': 1 };
-            const aOrder = riskOrder[a.risk_level as keyof typeof riskOrder] || 0;
-            const bOrder = riskOrder[b.risk_level as keyof typeof riskOrder] || 0;
-            if (aOrder !== bOrder) {
-              return bOrder - aOrder; // Higher risk first
-            }
-            return b.risk_score - a.risk_score; // Higher score first
-          })
-          .slice(0, 3);
-        
-        console.log('Top 3 security alerts:', topRiskLogs); // Debug log
-        setRecentActivity(topRiskLogs);
+        setRecentActivity(sortedLogs.slice(0, 3));
       } else {
         setRecentActivity([]);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to fetch dashboard data");
-      console.error("Dashboard data fetch error:", err);
+
+      if (deploymentsResponse.data.success) {
+        setDeployments(deploymentsResponse.data.deployments.slice(0, 3)); // Get latest 3 deployments
+      } else {
+        setDeployments([]);
+      }
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError("Failed to load dashboard data");
+      setStats(null);
+      setTrends(null);
+      setRecentActivity([]);
+      setDeployments([]);
     } finally {
       setLoading(false);
     }
@@ -159,24 +180,22 @@ export default function Dashboard() {
   };
 
   const formatTimeAgo = (timestamp: string) => {
-    try {
-      const now = new Date();
-      const time = new Date(timestamp);
-      
-      // Check if the date is valid
-      if (isNaN(time.getTime())) {
-        return "Unknown time";
-      }
-      
-      const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-      
-      if (diffInMinutes < 1) return "Just now";
-      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-      return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    } catch (error) {
-      return "Unknown time";
-    }
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return "Just now";
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   if (loading) {
@@ -428,72 +447,44 @@ export default function Dashboard() {
           </div>
           <div className="flow-root">
             <ul role="list" className="-my-5 divide-y divide-gray-200 dark:divide-gray-700">
-              <li className="py-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-                      <CloudArrowUpIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true" />
+              {deployments.length > 0 ? (
+                deployments.map((deployment, index) => (
+                  <li key={deployment._id} className="py-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                          <CloudArrowUpIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true" />
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                          {deployment.file_name}
+                        </p>
+                        <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                          {formatFileSize(deployment.file_size)} • {deployment.deployment_type} • {formatTimeAgo(deployment.timestamp)}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          deployment.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                          deployment.status === 'failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                          'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        }`}>
+                          {deployment.status}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                      Security Monitoring Agent
-                    </p>
-                    <p className="truncate text-sm text-gray-500 dark:text-gray-400">
-                      Deployed 1 day ago
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:text-blue-200">
-                      Active
-                    </span>
-                  </div>
-                </div>
-              </li>
-              <li className="py-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-                      <CloudArrowUpIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true" />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                      Log Collection Service
-                    </p>
-                    <p className="truncate text-sm text-gray-500 dark:text-gray-400">
-                      Deployed 3 days ago
+                  </li>
+                ))
+              ) : (
+                <li className="py-4">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No deployments yet. Start deploying files to see activity here.
                     </p>
                   </div>
-                  <div className="flex-shrink-0">
-                    <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:text-blue-200">
-                      Active
-                    </span>
-                  </div>
-                </div>
-              </li>
-              <li className="py-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-                      <CloudArrowUpIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true" />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                      Threat Intelligence Feed
-                    </p>
-                    <p className="truncate text-sm text-gray-500 dark:text-gray-400">
-                      Deployed 1 week ago
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:text-green-200">
-                      Stable
-                    </span>
-                  </div>
-                </div>
-              </li>
+                </li>
+              )}
             </ul>
           </div>
         </div>
