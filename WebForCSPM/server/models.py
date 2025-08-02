@@ -16,6 +16,7 @@ db = client.cspm_db
 # Collections
 logs_collection = db.logs
 stats_collection = db.stats
+deployments_collection = db.deployments
 
 class LogEntry:
     def __init__(self, event_id, event_name, user_identity_type, source_ip, 
@@ -513,6 +514,130 @@ class User:
             result = db.users.insert_one(user_data)
             self._id = result.inserted_id
         return self
+
+class Deployment:
+    def __init__(self, file_name, file_type, file_size, deployment_type, status="pending", timestamp=None, user_id=None, _id=None):
+        self.file_name = file_name
+        self.file_type = file_type
+        self.file_size = file_size
+        self.deployment_type = deployment_type
+        self.status = status
+        self.timestamp = timestamp or datetime.utcnow()
+        self.user_id = user_id
+        self._id = _id
+    
+    def to_dict(self):
+        return {
+            'file_name': self.file_name,
+            'file_type': self.file_type,
+            'file_size': self.file_size,
+            'deployment_type': self.deployment_type,
+            'status': self.status,
+            'timestamp': self.timestamp,
+            'user_id': self.user_id
+        }
+    
+    @staticmethod
+    def from_dict(data):
+        return Deployment(
+            file_name=data.get('file_name'),
+            file_type=data.get('file_type'),
+            file_size=data.get('file_size'),
+            deployment_type=data.get('deployment_type'),
+            status=data.get('status'),
+            timestamp=data.get('timestamp'),
+            user_id=data.get('user_id'),
+            _id=data.get('_id')
+        )
+
+class DeploymentManager:
+    @staticmethod
+    def add_deployment(deployment):
+        """Add a new deployment and maintain only the latest 5 deployments per user"""
+        try:
+            # Get user_id from the deployment
+            user_id = deployment.user_id
+            print(f"Adding deployment for user: {user_id}")  # Debug log
+            
+            # Insert the new deployment
+            deployments_collection.insert_one(deployment.to_dict())
+            
+            # Update user's deployment count atomically using MongoDB's atomic operations
+            from pymongo import UpdateOne
+            from bson import ObjectId
+            
+            # First, ensure the user has a deployment_count field
+            user = db.users.find_one({'_id': ObjectId(user_id)})
+            if user and 'deployment_count' not in user:
+                print(f"Initializing deployment_count for user {user_id}")  # Debug log
+                # Initialize deployment_count to current deployment count
+                current_count = deployments_collection.count_documents({'user_id': user_id})
+                db.users.update_one(
+                    {'_id': ObjectId(user_id)},
+                    {'$set': {'deployment_count': current_count}}
+                )
+            
+            # Increment the deployment count and get the new value atomically
+            result = db.users.find_one_and_update(
+                {'_id': ObjectId(user_id)},
+                {'$inc': {'deployment_count': 1}},
+                return_document=True
+            )
+            
+            print(f"Updated deployment count for user {user_id}: {result.get('deployment_count', 0) if result else 'No result'}")  # Debug log
+            
+            if result and result.get('deployment_count', 0) > 5:
+                print(f"User {user_id} has {result.get('deployment_count', 0)} deployments, cleaning up...")  # Debug log
+                # We're over the limit, do cleanup
+                newest_5 = list(deployments_collection.find({'user_id': user_id}).sort('timestamp', -1).limit(5))
+                if newest_5:
+                    cutoff_timestamp = newest_5[-1]['timestamp']
+                    # Delete everything older than the 5th newest deployment
+                    deleted_count = deployments_collection.delete_many({
+                        'user_id': user_id,
+                        'timestamp': {'$lt': cutoff_timestamp}
+                    }).deleted_count
+                    
+                    print(f"Deleted {deleted_count} old deployments for user {user_id}")  # Debug log
+                    
+                    # Reset the deployment count to 5
+                    db.users.update_one(
+                        {'_id': ObjectId(user_id)},
+                        {'$set': {'deployment_count': 5}}
+                    )
+                    print(f"Reset deployment count to 5 for user {user_id}")  # Debug log
+            
+            return True
+        except Exception as e:
+            print(f"Error adding deployment: {e}")
+            return False
+    
+    @staticmethod
+    def get_deployments(user_id=None):
+        """Get deployments for a user, filtered by user if specified"""
+        try:
+            query = {}
+            if user_id:
+                query['user_id'] = user_id
+            
+            deployments = list(deployments_collection.find(query).sort('timestamp', -1))
+            return deployments
+        except Exception as e:
+            print(f"Error getting deployments: {e}")
+            return []
+    
+    @staticmethod
+    def get_deployments_count(user_id=None):
+        """Get total number of deployments, filtered by user if specified"""
+        try:
+            query = {}
+            if user_id:
+                query['user_id'] = user_id
+            
+            return deployments_collection.count_documents(query)
+        except Exception as e:
+            print(f"Error getting deployments count: {e}")
+            return 0
 
 # Anomaly Detection Model
 class AnomalyDetector:

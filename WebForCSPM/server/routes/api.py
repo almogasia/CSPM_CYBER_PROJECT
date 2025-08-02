@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import LogEntry, LogManager
+from models import LogEntry, LogManager, Deployment, DeploymentManager
 import os
 from datetime import datetime, timedelta
 
@@ -408,3 +408,82 @@ def process_calculation(data):
         'processed': True,
         'input_summary': f"Processed input with {len(data)} parameters"
     }
+
+@api_bp.route('/deployments', methods=['GET'])
+def get_deployments():
+    """Get deployments for the authenticated user"""
+    try:
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            deployments = DeploymentManager.get_deployments(user_id=user_id)
+            
+            # Convert ObjectId to string for JSON serialization
+            for deployment in deployments:
+                deployment['_id'] = str(deployment['_id'])
+                if 'timestamp' in deployment:
+                    deployment['timestamp'] = deployment['timestamp'].isoformat()
+            
+            return jsonify({
+                'success': True,
+                'deployments': deployments
+            })
+        
+        return protected_route()
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch deployments: {str(e)}'}), 500
+
+@api_bp.route('/deploy', methods=['POST'])
+def deploy_file():
+    """Deploy a file and track the deployment"""
+    try:
+        from middleware import auth_middleware
+        
+        @auth_middleware
+        def protected_route():
+            # Get user_id from the authenticated request
+            user_id = request.user_id
+            
+            # Get file information from request
+            data = request.json
+            file_name = data.get('file_name', 'Unknown File')
+            file_type = data.get('file_type', 'Unknown')
+            file_size = data.get('file_size', 0)
+            deployment_type = data.get('deployment_type', 'General')
+            
+            # Create deployment record
+            deployment = Deployment(
+                file_name=file_name,
+                file_type=file_type,
+                file_size=file_size,
+                deployment_type=deployment_type,
+                status="completed",  # Simulate successful deployment
+                user_id=user_id
+            )
+            
+            # Add deployment to database
+            success = DeploymentManager.add_deployment(deployment)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'Successfully deployed {file_name}',
+                    'deployment': {
+                        'file_name': file_name,
+                        'file_type': file_type,
+                        'file_size': file_size,
+                        'deployment_type': deployment_type,
+                        'status': 'completed',
+                        'timestamp': deployment.timestamp.isoformat()
+                    }
+                })
+            else:
+                return jsonify({'error': 'Failed to save deployment'}), 500
+        
+        return protected_route()
+    except Exception as e:
+        return jsonify({'error': f'Deployment failed: {str(e)}'}), 500

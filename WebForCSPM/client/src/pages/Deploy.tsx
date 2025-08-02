@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   CloudArrowUpIcon,
   ServerIcon,
@@ -14,6 +15,8 @@ import {
   CircleStackIcon,
 } from "@heroicons/react/24/outline";
 
+const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
 interface DeploymentTarget {
   id: string;
   name: string;
@@ -26,14 +29,13 @@ interface DeploymentTarget {
 }
 
 interface Deployment {
-  id: number;
-  name: string;
-  target: string;
-  status: "completed" | "in_progress" | "failed";
+  _id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  deployment_type: string;
+  status: string;
   timestamp: string;
-  progress?: number;
-  duration?: string;
-  size?: string;
 }
 
 interface DeploymentTemplate {
@@ -158,50 +160,49 @@ const deploymentTemplates: DeploymentTemplate[] = [
 
 const recentDeployments: Deployment[] = [
   {
-    id: 1,
-    name: "Security Monitoring Agent",
-    target: "AWS Production",
+    _id: "1",
+    file_name: "security_config.yaml",
+    file_type: "YAML",
+    file_size: 45000,
+    deployment_type: "Security",
     status: "completed",
     timestamp: "2024-03-24T10:30:00Z",
-    duration: "8m 32s",
-    size: "45.2 MB",
   },
   {
-    id: 2,
-    name: "Log Collection Service",
-    target: "Azure Development",
+    _id: "2",
+    file_name: "log_config.json",
+    file_type: "JSON",
+    file_size: 12000,
+    deployment_type: "Monitoring",
     status: "in_progress",
     timestamp: "2024-03-24T10:25:00Z",
-    progress: 65,
-    duration: "5m 18s",
-    size: "23.7 MB",
   },
   {
-    id: 3,
-    name: "Compliance Scanner",
-    target: "GCP Staging",
+    _id: "3",
+    file_name: "compliance_report.pdf",
+    file_type: "PDF",
+    file_size: 50000,
+    deployment_type: "Compliance",
     status: "failed",
     timestamp: "2024-03-24T10:20:00Z",
-    duration: "12m 45s",
-    size: "67.8 MB",
   },
   {
-    id: 4,
-    name: "Network Security Monitor",
-    target: "AWS Staging",
+    _id: "4",
+    file_name: "network_policy.yaml",
+    file_type: "YAML",
+    file_size: 30000,
+    deployment_type: "Security",
     status: "completed",
     timestamp: "2024-03-24T09:45:00Z",
-    duration: "6m 12s",
-    size: "34.1 MB",
   },
   {
-    id: 5,
-    name: "Data Protection Suite",
-    target: "Azure Production",
+    _id: "5",
+    file_name: "data_encryption.yaml",
+    file_type: "YAML",
+    file_size: 20000,
+    deployment_type: "Security",
     status: "completed",
     timestamp: "2024-03-24T08:30:00Z",
-    duration: "9m 28s",
-    size: "52.3 MB",
   },
 ];
 
@@ -212,6 +213,31 @@ export default function Deploy() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDeployments();
+  }, []);
+
+  const fetchDeployments = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/deployments`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      
+      if (response.data.success) {
+        setDeployments(response.data.deployments);
+      } else {
+        setError("Failed to fetch deployments.");
+      }
+    } catch (err) {
+      setError("Failed to fetch deployments.");
+      console.error(err);
+    }
+  };
 
   const handleFileChange = (e: any) => {
     if (e.target.files && e.target.files[0]) {
@@ -219,17 +245,48 @@ export default function Deploy() {
     }
   };
 
-  const handleDeploy = () => {
+  const handleDeploy = async () => {
+    if (!file) {
+      setError("Please select a file to deploy.");
+      return;
+    }
+
     setIsDeploying(true);
-    // Simulate deployment
-    setTimeout(() => {
+    
+    try {
+      const deploymentData = {
+        file_name: file.name,
+        file_type: file.type || 'Unknown',
+        file_size: file.size,
+        deployment_type: selectedTemplate || 'General'
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/deploy`, deploymentData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.data.success) {
+        // Add new deployment to the list
+        setDeployments(prev => [response.data.deployment, ...prev]);
+        setFile(null); // Clear file after deployment
+        setError(null);
+      } else {
+        setError("Deployment failed. Please try again.");
+      }
+    } catch (err) {
+      setError("Deployment failed. Please try again.");
+      console.error(err);
+    } finally {
       setIsDeploying(false);
-    }, 3000);
+    }
   };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Simulate refresh
+    fetchDeployments();
     setTimeout(() => {
       setIsRefreshing(false);
     }, 1000);
@@ -399,6 +456,12 @@ export default function Deploy() {
             Deployment Configuration
           </h2>
           
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+              {error}
+            </div>
+          )}
+          
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
@@ -499,38 +562,29 @@ export default function Deploy() {
         </div>
         
         <div className="space-y-4">
-          {recentDeployments.map((deployment) => (
-            <div key={deployment.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+          {deployments.map((deployment) => (
+            <div key={deployment._id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
               <div className="flex items-center space-x-4">
                 <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-lg flex items-center justify-center">
                   <CloudArrowUpIcon className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                 </div>
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">
-                    {deployment.name}
+                    {deployment.file_name}
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {deployment.target} • {formatTimeAgo(deployment.timestamp)}
+                    Type: {deployment.file_type}, Size: {deployment.file_size} bytes
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Deployment Type: {deployment.deployment_type} • Status: {deployment.status}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Timestamp: {formatTimeAgo(deployment.timestamp)}
                   </p>
                 </div>
               </div>
               
               <div className="flex items-center space-x-4">
-                {deployment.progress && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {deployment.progress}%
-                  </div>
-                )}
-                {deployment.duration && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {deployment.duration}
-                  </div>
-                )}
-                {deployment.size && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {deployment.size}
-                  </div>
-                )}
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(deployment.status)}`}>
                   {deployment.status}
                 </span>
@@ -552,7 +606,7 @@ export default function Deploy() {
                 Successful
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                24
+                {deployments.filter(d => d.status === "completed").length}
               </p>
             </div>
           </div>
@@ -568,7 +622,7 @@ export default function Deploy() {
                 In Progress
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                2
+                {deployments.filter(d => d.status === "in_progress").length}
               </p>
             </div>
           </div>
@@ -584,7 +638,7 @@ export default function Deploy() {
                 Failed
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                3
+                {deployments.filter(d => d.status === "failed").length}
               </p>
             </div>
           </div>
@@ -600,7 +654,7 @@ export default function Deploy() {
                 Active Targets
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                4
+                {deploymentTargets.filter(t => t.status === "active").length}
               </p>
             </div>
           </div>
