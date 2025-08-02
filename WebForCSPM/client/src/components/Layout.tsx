@@ -217,11 +217,12 @@ export default function Layout({
       </div>
 
       <div className="lg:pl-64">
-        {/* Top bar with username, logout, and dark mode toggle */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 lg:pl-0">
+        {/* Professional Top Bar */}
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm px-4 shadow-lg sm:gap-x-6 sm:px-6 lg:px-8 lg:pl-0">
+          {/* Mobile menu button */}
           <button
             type="button"
-            className="-m-2.5 p-2.5 text-gray-700 dark:text-gray-300 lg:hidden"
+            className="-m-2.5 p-2.5 text-gray-700 dark:text-gray-300 lg:hidden hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>
@@ -230,25 +231,37 @@ export default function Layout({
 
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1"></div>
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <div className="flex items-center gap-x-2 text-sm text-gray-700 dark:text-gray-300">
-                <span>Welcome, {username}</span>
+            
+            {/* Right side controls */}
+            <div className="flex items-center gap-x-3 lg:gap-x-4">
+              {/* User welcome message */}
+              <div className="hidden sm:flex items-center gap-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Welcome, {username}</span>
               </div>
-              <button
-                onClick={onLogout}
-                className="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-              >
-                Logout
-              </button>
+              
+              {/* Divider */}
+              <div className="hidden sm:block w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+              
+              {/* Dark mode toggle */}
               <button
                 onClick={toggleDarkMode}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 hover:scale-105"
+                title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
               >
                 {isDarkMode ? (
-                  <SunIcon className="h-6 w-6 text-gray-300" />
+                  <SunIcon className="h-5 w-5 text-yellow-400" />
                 ) : (
-                  <MoonIcon className="h-6 w-6 text-gray-700" />
+                  <MoonIcon className="h-5 w-5 text-gray-600" />
                 )}
+              </button>
+              
+              {/* Logout button */}
+              <button
+                onClick={onLogout}
+                className="px-4 py-2 text-sm font-medium bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-105"
+              >
+                Logout
               </button>
             </div>
           </div>
